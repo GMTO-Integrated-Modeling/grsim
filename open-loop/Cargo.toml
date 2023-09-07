@@ -1,0 +1,19 @@
+[package]
+name = "grsim_open-loop"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+publish = false
+
+[dependencies]
+anyhow = "1.0.75"
+gmt_dos-actors = "7.1.2"
+gmt_dos-clients = "2.2.0"
+gmt_dos-clients_arrow = "1.1.0"
+gmt_dos-clients_crseo = "2.0.1"
+gmt_dos-clients_io = "2.5.0"
+tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
