@@ -12,3 +12,7 @@ keywords = ["telescope", "astronomy"]
 
 [profile.release]
 lto = "thin"
+
+[patch.crates-io]
+gmt_dos-actors = { path = "/home/ubuntu/projects/dos-actors/actors" }
+gmt_dos-clients = { path = "/home/ubuntu/projects/dos-actors/clients/interface" }

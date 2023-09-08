@@ -1,5 +1,7 @@
 use gmt_dos_actors::actorscript;
+#[cfg(feature = "scope-server")]
 use gmt_dos_clients::{Tick, Timer};
+#[cfg(feature = "scope-server")]
 use gmt_dos_clients_crseo::{
     crseo::{atmosphere, Atmosphere, FromBuilder},
     OpticalModel,
@@ -21,23 +23,27 @@ async fn main() -> anyhow::Result<()> {
     let n_sample = (sim_duration * sampling_frequency) as usize;
 
     // Atmospher builder
+    #[cfg(feature = "scope-server")]
     let atm_builder = Atmosphere::builder().ray_tracing(
         atmosphere::RayTracing::default()
             .duration(sim_duration)
             .filepath(&data_repo.join("atmosphere.bin")),
     );
 
+    
     // GMT optical model
+    #[cfg(feature = "scope-server")]
     let gom = OpticalModel::builder()
         .atmosphere(atm_builder)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
 
-    let heartbeat: Timer = Timer::new(n_sample);
+    #[cfg(feature = "scope-server")]
+    let heartbeat: Timer = Timer::new(n_sample); 
 
     actorscript! {
         #[model(state = completed)]
-        1: heartbeat[Tick] -> gom[WfeRms]$
+        1: heartbeat[Tick] -> gom[WfeRms]$~
     }
 
     Ok(())
