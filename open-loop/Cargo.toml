@@ -11,12 +11,12 @@ publish = true
 
 [dependencies]
 anyhow = "1.0.75"
-gmt_dos-actors = "7.1.2"
-gmt_dos-clients = "2.2.0"
-gmt_dos-clients_arrow = { version = "1.1.0", optional = true }
-gmt_dos-clients_crseo = { version = "2.0.1", optional = true }
-gmt_dos-clients_io = "2.5.0"
-gmt_dos-clients_scope = { version = "0.2.0", path = "../../dos-actors/clients/scope", optional = true }
+gmt_dos-actors = "8.0.0"
+gmt_dos-clients = "2.3.0"
+gmt_dos-clients_arrow = { version = "1.1.1", optional = true }
+gmt_dos-clients_crseo = { version = "2.0.2", optional = true }
+gmt_dos-clients_io = "2.6.1"
+gmt_dos-clients_scope = { version = "1.0.0", optional = true }
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
 
 [features]
