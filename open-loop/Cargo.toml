@@ -8,22 +8,23 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 publish = true
+default-run = "open-loop"
 
 [dependencies]
 anyhow = "1.0.75"
-gmt_dos-actors = "8.0.0"
-gmt_dos-clients = "2.3.0"
-gmt_dos-clients_arrow = { version = "1.1.1", optional = true }
-gmt_dos-clients_crseo = { version = "2.0.2", optional = true }
-gmt_dos-clients_io = "2.6.1"
-gmt_dos-clients_scope = { version = "1.0.0", optional = true }
+gmt_dos-actors = "8.0"
+gmt_dos-clients = "2.4"
+gmt_dos-clients_arrow = { version = "1.1.1" }
+gmt_dos-clients_crseo = { version = "2.1" }
+gmt_dos-clients_io = "2.6"
+gmt_dos-clients_scope = { version = "1.0", optional = true }
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = ["scope-server"]
-scope-server = [
-    "gmt_dos-clients_arrow",
-    "gmt_dos-clients_crseo",
-    "gmt_dos-clients_scope/server",
-]
+scope-server = ["gmt_dos-clients_scope/server"]
 scope-client = ["gmt_dos-clients_scope/client"]
+
+[[bin]]
+name = "open-loop"
+path = "src/main.rs"

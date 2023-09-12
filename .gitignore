@@ -6,3 +6,5 @@
 *.bin
 *.parquet
 *.der
+*.vscode
+*bin*
