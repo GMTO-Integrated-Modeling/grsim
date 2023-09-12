@@ -11,3 +11,7 @@ The scope client is run with:
 ```shell
 cargo run -p grsim_open-loop --release --features scope-client --bin scope-WfeRms
 ```
+
+## Flowchart
+
+![open-loop flowchart](model.dot.png)

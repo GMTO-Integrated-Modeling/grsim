@@ -118,12 +118,12 @@ async fn main() -> anyhow::Result<()> {
         1: timer[Tick] -> gom
         1: gom[GuideStar]
             -> sensor("PWFS")[ResidualM2modes]
-                -> split_piston[Piston<ResidualM2modes>]
+                -> split_piston("Split Piston\nfrom other modes")[Piston<ResidualM2modes>]
                    -> piston_ctrl("Piston\nControl")[Piston<ResidualM2modes>]!
-                      -> merge_piston
-        1: split_piston[NoPiston<ResidualM2modes>]
+                      -> merge_piston("Merge Piston\nwith other modes")
+        1: split_piston("Split Piston\nfrom other modes")[NoPiston<ResidualM2modes>]
             -> no_piston_ctrl("No Piston Modes\nControl")[NoPiston<ResidualM2modes>]!
-                -> merge_piston[M2modes] -> gom
+                -> merge_piston("Merge Piston\nwith other modes")[M2modes] -> gom
         1: gom[GuideStar] -> piston_sensor("HDFS")
         100: piston_sensor("HDFS")[ResidualPistonMode]! -> offset_piston
         1: offset_piston[PistonOffset] -> piston_ctrl("Piston\nControl")

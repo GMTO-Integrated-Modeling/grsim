@@ -15,3 +15,7 @@ and with
 ```shell
 cargo run -p grsim_ngao --release --features scope-client --bin scope-SegmentPiston
 ```
+
+## Flowchart
+
+![open-loop flowchart](model.dot.png)
