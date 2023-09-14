@@ -11,14 +11,14 @@ default-run = "ngao"
 
 [dependencies]
 anyhow = "1.0.75"
-gmt_dos-actors = "8.0"
-gmt_dos-clients = "2.4"
-interface = { path = "/home/ubuntu/projects/dos-actors/interface", package = "gmt_dos-actors-clients_interface" }
-gmt_dos-clients_arrow = { version = "1.1.1" }
-gmt_dos-clients_crseo = { version = "2.1" }
-gmt_dos-clients_io = "2.6"
+gmt_dos-actors = "9.0"
+gmt_dos-clients = "3.0"
+interface = { version = "0.1.1", package = "gmt_dos-actors-clients_interface" }
+gmt_dos-clients_arrow = "2.0"
+gmt_dos-clients_crseo = "3.0"
+gmt_dos-clients_io = "3.0"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
-gmt_dos-clients_scope = { version = "1.0", optional = true }
+gmt_dos-clients_scope = { version = "2.0", optional = true }
 
 [features]
 default = ["scope-server"]
