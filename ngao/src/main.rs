@@ -15,7 +15,7 @@ use gmt_dos_clients_crseo::{
     },
     GuideStar, OpticalModel, ResidualM2modes, ResidualPistonMode, WavefrontSensor,
 };
-use gmt_dos_clients_io::optics::{M2modes, SegmentPiston, WfeRms};
+use gmt_dos_clients_io::optics::M2modes;
 
 const PYWFS_READOUT: usize = 8;
 const PYWFS: usize = 8;
@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
             SegmentCalibration::modes(m2_modes, 0..n_mode, "M2"),
             src_builder.clone(),
         );
-        println!(
+        eprintln!(
             "M2 {}modes/segment calibrated in {}s",
             n_mode,
             now.elapsed().as_secs()
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
             SegmentCalibration::modes(m2_modes, 0..1, "M2"),
             src_builder.clone(),
         );
-        println!(
+        eprintln!(
             "M2 {}modes/segment calibrated in {}s",
             1,
             now.elapsed().as_secs()
@@ -104,8 +104,8 @@ async fn main() -> anyhow::Result<()> {
     // let sampler_hdfs_to_pwfs = Pulse::new(1, vec![0f64; 7]);
 
     // let pwfs_integrator = PwfsIntegrator::single_single(n_mode, 0.5f64);
-    let no_piston_ctrl = Integrator::new((n_mode - 1) * 7).gain(0.5);
-    let piston_ctrl = Integrator::new(7).gain(0.5);
+    let no_piston_ctrl = Integrator::<NoPiston<ResidualM2modes>>::new((n_mode - 1) * 7).gain(0.5);
+    let piston_ctrl = Integrator::<Piston<ResidualM2modes>>::new(7).gain(0.5);
 
     let (split_piston, merge_piston) =
         leftright::split_merge_chunks_at::<ResidualM2modes, M2modes>(n_mode, 1);
@@ -115,20 +115,20 @@ async fn main() -> anyhow::Result<()> {
 
     actorscript! {
         #[model(state = completed)]
-        1: timer[Tick] -> gom
-        1: gom[GuideStar]
-            -> sensor("PWFS")[ResidualM2modes]
-                -> split_piston("Split Piston\nfrom other modes")[Piston<ResidualM2modes>]
-                   -> piston_ctrl("Piston\nControl")[Piston<ResidualM2modes>]!
-                      -> merge_piston("Merge Piston\nwith other modes")
+        1: timer[Tick]
+            -> gom[GuideStar]
+                -> sensor("PWFS")[ResidualM2modes]
+                    -> split_piston("Split Piston\nfrom other modes")[Piston<ResidualM2modes>]
+                        -> piston_ctrl("Piston\nControl")[Piston<ResidualM2modes>]!
+                            -> merge_piston("Merge Piston\nwith other modes")
         1: split_piston("Split Piston\nfrom other modes")[NoPiston<ResidualM2modes>]
             -> no_piston_ctrl("No Piston Modes\nControl")[NoPiston<ResidualM2modes>]!
                 -> merge_piston("Merge Piston\nwith other modes")[M2modes] -> gom
         1: gom[GuideStar] -> piston_sensor("HDFS")
         100: piston_sensor("HDFS")[ResidualPistonMode]! -> offset_piston
         1: offset_piston[PistonOffset] -> piston_ctrl("Piston\nControl")
-        1: gom[WfeRms]~
-        1: gom[SegmentPiston]~
+        1: gom[gmt_dos_clients_io::optics::WfeRms]~
+        1: gom[gmt_dos_clients_io::optics::SegmentPiston]~
     }
 
     Ok(())

@@ -19,7 +19,7 @@ and in a terminal at the grsim root run `crypto`
 
  The model is run with:
 ```shell
-cargo run --release --bin open-loop
+cargo run --release --bin open-loop > open-loop/src/bin/scope-WfeRms.rs
 ```
 
 The scope client is run with:
@@ -33,16 +33,16 @@ cargo run -p grsim_open-loop --release --features scope-client --bin scope-WfeRm
 
   The model is run with:
 ```shell
-cargo run --release --bin ngao
+cargo run --release --bin ngao > ngao/src/bin/scope-clients.rs 
 ```
 
 The scopes client are run with:
 ```shell
-cargo run -p grsim_ngao --release --features scope-client --bin scope-WfeRms
+cargo run -p grsim_ngao --release --features scope-client --bin scope-clients -- wferms
 ```
 and with 
 ```shell
-cargo run -p grsim_ngao --release --features scope-client --bin scope-SegmentPiston
+cargo run -p grsim_ngao --release --features scope-client --bin scope-clients -- segmentpiston
 ```
 
 [`gmt_dos-actors`]: https://crates.io/crates/gmt_dos-actors
