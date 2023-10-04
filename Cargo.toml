@@ -1,5 +1,5 @@
 [workspace]
-members = ["open-loop", "ngao", "mount", "m1"]
+members = ["open-loop", "ngao"]
 resolver = "2"
 
 [workspace.package]
