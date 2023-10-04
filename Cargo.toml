@@ -30,6 +30,5 @@ skyangle = "0.2.2"
 gmt_dos-clients_lom = "1.0"
 gmt_dos-clients_scope-client = "0.1.0"
 
-
 [profile.release]
 lto = "thin"

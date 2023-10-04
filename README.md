@@ -6,12 +6,6 @@ Users should start by reading the [GMT Dos Actors] book and familiarize themselv
 
 To run any of the model, [Rust] must be installed on the machine.
 
-To run the scopes, install crypto with
-```shell
-cargo install --bin crypto gmt_dos-clients_transceiver
-```
-and in a terminal at the grsim root run `crypto`
-
  
  ## [open-loop](open-loop/README.md)
  
@@ -19,12 +13,7 @@ and in a terminal at the grsim root run `crypto`
 
  The model is run with:
 ```shell
-cargo run --release --bin open-loop > open-loop/src/bin/scope-WfeRms.rs
-```
-
-The scope client is run with:
-```shell
-cargo run -p grsim_open-loop --release --features scope-client --bin scope-WfeRms
+cargo run --release --bin open-loop
 ```
 
  ## [ngao](ngao/README.md)
@@ -33,16 +22,7 @@ cargo run -p grsim_open-loop --release --features scope-client --bin scope-WfeRm
 
   The model is run with:
 ```shell
-cargo run --release --bin ngao > ngao/src/bin/scope-clients.rs 
-```
-
-The scopes client are run with:
-```shell
-cargo run -p grsim_ngao --release --features scope-client --bin scope-clients -- wferms
-```
-and with 
-```shell
-cargo run -p grsim_ngao --release --features scope-client --bin scope-clients -- segmentpiston
+cargo run --release --bin ngao
 ```
 
 [`gmt_dos-actors`]: https://crates.io/crates/gmt_dos-actors
