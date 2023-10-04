@@ -4,6 +4,8 @@ use gmt_dos_clients_crseo::{
     crseo::{atmosphere, Atmosphere, FromBuilder},
     OpticalModel,
 };
+use gmt_dos_clients_io::optics::WfeRms;
+use interface::units::NM;
 use std::{env, path::Path};
 
 #[tokio::main]
@@ -36,7 +38,7 @@ async fn main() -> anyhow::Result<()> {
 
     actorscript! {
         #[model(state = completed)]
-        1: heartbeat[Tick] -> gom[gmt_dos_clients_io::optics::WfeRms]$~
+        1: heartbeat[Tick] -> gom[NM<WfeRms>]$~
     }
 
     Ok(())
