@@ -1,7 +1,6 @@
 [workspace]
-members = ["open-loop", "ngao"]
+members = ["open-loop", "ngao", "mount", "m1"]
 resolver = "2"
-
 
 [workspace.package]
 authors = ["Rod Conan <rconan@gmto.org>"]
@@ -10,6 +9,26 @@ license = "MIT"
 repository = "https://github.com/rconan/grsim"
 categories = ["science", "simulation"]
 keywords = ["telescope", "astronomy"]
+publish = false
+
+[workspace.dependencies]
+anyhow = "1.0.75"
+tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
+gmt_dos-actors = "10.0"
+gmt_dos-clients = "3.1"
+interface = { version = "0.1", package = "gmt_dos-actors-clients_interface" }
+gmt_dos-clients_io = "3.0"
+gmt_dos-clients_arrow = "2.0"
+gmt_dos-clients_crseo = "3.1"
+gmt_dos-clients_scope = { version = "2.1", features = ["server"] }
+gmt_dos-clients_scope-client = "0.1.0"
+gmt-fem = { version = "5.0.0" }
+gmt_dos-clients_fem = { version = "4.0" }
+gmt_dos-clients_mount = { version = "3.0" }
+gmt_dos-clients_m1-ctrl = { version = "3.0" }
+gmt_dos-clients_m2-ctrl = { version = "1.1.0" }
+skyangle = "0.2.2"
+gmt_dos-clients_lom = "1.0"
 
 [profile.release]
 lto = "thin"
