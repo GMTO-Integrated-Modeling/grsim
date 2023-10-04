@@ -16,16 +16,11 @@ gmt_dos-actors.workspace = true
 gmt_dos-clients_scope-client.workspace = true
 anyhow.workspace = true
 gmt_dos-clients.workspace = true
-gmt_dos-clients_scope = { workspace = true, optional = true }
+gmt_dos-clients_scope = { workspace = true, features = ["server"] }
 interface.workspace = true
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_crseo.workspace = true
 gmt_dos-clients_arrow.workspace = true
-
-[features]
-default = ["scope-server"]
-scope-server = ["gmt_dos-clients_scope/server"]
-scope-client = ["gmt_dos-clients_scope/client"]
 
 [[bin]]
 name = "open-loop"
