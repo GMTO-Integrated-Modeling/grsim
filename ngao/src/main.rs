@@ -15,7 +15,8 @@ use gmt_dos_clients_crseo::{
     },
     GuideStar, OpticalModel, ResidualM2modes, ResidualPistonMode, WavefrontSensor,
 };
-use gmt_dos_clients_io::optics::M2modes;
+use gmt_dos_clients_io::optics::{M2modes, SegmentPiston, WfeRms};
+use interface::units;
 
 const PYWFS_READOUT: usize = 8;
 const PYWFS: usize = 8;
@@ -101,9 +102,6 @@ async fn main() -> anyhow::Result<()> {
 
     let timer: Timer = Timer::new(n_sample);
 
-    // let sampler_hdfs_to_pwfs = Pulse::new(1, vec![0f64; 7]);
-
-    // let pwfs_integrator = PwfsIntegrator::single_single(n_mode, 0.5f64);
     let no_piston_ctrl = Integrator::<NoPiston<ResidualM2modes>>::new((n_mode - 1) * 7).gain(0.5);
     let piston_ctrl = Integrator::<Piston<ResidualM2modes>>::new(7).gain(0.5);
 
@@ -112,6 +110,8 @@ async fn main() -> anyhow::Result<()> {
     let offset_piston = Once::<ResidualPistonMode>::new();
 
     type PistonOffset = Offset<ResidualPistonMode>;
+    type WfeRmsNm = units::NM<WfeRms>;
+    type SegmentPistonNm = units::NM<SegmentPiston>;
 
     actorscript! {
         #[model(state = completed)]
@@ -127,8 +127,8 @@ async fn main() -> anyhow::Result<()> {
         1: gom[GuideStar] -> piston_sensor("HDFS")
         100: piston_sensor("HDFS")[ResidualPistonMode]! -> offset_piston
         1: offset_piston[PistonOffset] -> piston_ctrl("Piston\nControl")
-        1: gom[gmt_dos_clients_io::optics::WfeRms]~
-        1: gom[gmt_dos_clients_io::optics::SegmentPiston]~
+        1: gom[WfeRmsNm]~
+        1: gom[SegmentPistonNm]~
     }
 
     Ok(())

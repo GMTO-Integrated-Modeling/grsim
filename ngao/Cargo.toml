@@ -7,23 +7,20 @@ license.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
+publish.workspace = true
 default-run = "ngao"
 
 [dependencies]
-anyhow = "1.0.75"
-gmt_dos-actors = "9.0"
-gmt_dos-clients = "3.0"
-interface = { version = "0.1.1", package = "gmt_dos-actors-clients_interface" }
-gmt_dos-clients_arrow = "2.0"
-gmt_dos-clients_crseo = "3.0"
-gmt_dos-clients_io = "3.0"
-tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
-gmt_dos-clients_scope = { version = "2.0", optional = true }
-
-[features]
-default = ["scope-server"]
-scope-server = ["gmt_dos-clients_scope/server"]
-scope-client = ["gmt_dos-clients_scope/client"]
+anyhow.workspace = true
+tokio.workspace = true
+gmt_dos-actors.workspace = true
+gmt_dos-clients.workspace = true
+interface.workspace = true
+gmt_dos-clients_io.workspace = true
+gmt_dos-clients_arrow.workspace = true
+gmt_dos-clients_crseo.workspace = true
+gmt_dos-clients_scope.workspace = true
+gmt_dos-clients_scope-client.workspace = true
 
 [[bin]]
 name = "ngao"
