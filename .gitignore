@@ -8,3 +8,5 @@
 *.der
 *.vscode
 *bin*
+*.pkl
+*.png
