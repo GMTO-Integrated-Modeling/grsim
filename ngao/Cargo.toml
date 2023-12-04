@@ -14,14 +14,27 @@ default-run = "ngao"
 anyhow.workspace = true
 tokio.workspace = true
 gmt_dos-actors.workspace = true
-gmt_dos-clients.workspace = true
+gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
 interface.workspace = true
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_arrow.workspace = true
-gmt_dos-clients_crseo.workspace = true
+gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
 gmt_dos-clients_scope.workspace = true
 gmt_dos-clients_scope-client.workspace = true
+serde-pickle = "1.1.1"
+nanorand = "0.7.0"
+nalgebra = "0.32.3"
+crseo.workspace = true
+serde = { version = "1.0.188", features = ["derive"] }
+indicatif = { version = "0.17", features = ["rayon"] }
+rayon = "1.8.0"
+thiserror = "1.0.50"
+complot = "0.3.4"
+faer = { version = "0.15.0", features = ["nalgebra"], optional = true }
 
 [[bin]]
 name = "ngao"
 path = "src/main.rs"
+
+[dev-dependencies]
+nanorand = "0.7.0"

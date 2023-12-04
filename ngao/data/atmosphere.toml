@@ -47,5 +47,5 @@ wind_direction = [
 width = 25.5
 n_width_px = 512
 field_size = 0.0
-duration = 1.0
+duration = 5.0
 filepath = "/home/ubuntu/projects/grsim/ngao/data/atmosphere.bin"

@@ -7,12 +7,12 @@ use crseo::wavefrontsensor::{LensletArray, Pyramid};
 use crseo::{Builder, FromBuilder, Gmt, WavefrontSensorBuilder};
 
 use gmt_dos_clients_crseo::{
+    Calibration, Processor, PyramidCalibrator, PyramidMeasurements, PyramidProcessor,
+};
+use gmt_dos_clients_crseo::{
     DetectorFrame, GuideStar, OpticalModel, ResidualM2modes, WavefrontSensor,
 };
 use gmt_dos_clients_io::optics::M2modes;
-use grsim_ngao::{
-    Calibration, Processor, PyramidCalibrator, PyramidMeasurements, PyramidProcessor,
-};
 use interface::{Data, Read, UniqueIdentifier, Update, Write};
 
 #[tokio::main]
@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     let n_lenslet = 92;
     let m2_modes = "ASM_DDKLs_S7OC04184_675kls";
-    let n_mode: usize = 450; //env::var("N_KL_MODE").map_or_else(|_| 66, |x| x.parse::<usize>().unwrap());
+    let n_mode: usize = 500; //env::var("N_KL_MODE").map_or_else(|_| 66, |x| x.parse::<usize>().unwrap());
 
     let pym = Pyramid::builder()
         .lenslet_array(LensletArray {
