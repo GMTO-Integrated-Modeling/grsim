@@ -7,6 +7,5 @@
 *.parquet
 *.der
 *.vscode
-*bin*
 *.pkl
 *.png
