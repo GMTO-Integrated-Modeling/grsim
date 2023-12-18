@@ -1,4 +1,4 @@
-use std::{ops::{Mul, Deref, DerefMut}, sync::Arc};
+/* use std::{ops::{Mul, Deref, DerefMut}, sync::Arc};
 
 use crseo::CrseoError;
 use gmt_dos_clients_crseo::DetectorFrame;
@@ -128,3 +128,4 @@ where
         Some(Data::from(&self.output))
     }
 }
+ */

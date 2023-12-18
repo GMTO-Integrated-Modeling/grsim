@@ -14,8 +14,8 @@ use gmt_dos_clients_crseo::{
     Calibration, DetectorFrame, GuideStar, OpticalModel, Processor, PyramidCalibrator,
     PyramidMeasurements, ResidualM2modes, WavefrontSensor, WavefrontStats,
 };
-use gmt_dos_clients_io::optics::{M2modes, SegmentD7Piston, SegmentPiston};
-use gmt_dos_clients_scope::server::{Monitor, Scope};
+use gmt_dos_clients_io::optics::{M2modes, SegmentD7Piston, SegmentPiston, Wavefront};
+use gmt_dos_clients_scope::server::{Monitor, Scope, Shot};
 use interface::{units::NM, Data, Read, Tick, UniqueIdentifier, Update, Write, UID};
 use nanorand::{Rng, WyRand};
 
@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
     // Pyramid wafefront sensor
     let pyramid = WavefrontSensor::<_, 1>::new(pym);
     // Pyramid integral controller (modes>1)
-    let pym_ctrl = Integrator::<Right<ResidualM2modes>>::new(n_mode * 7).gain(0.5);
+    let pym_ctrl = Integrator::<Right<ResidualM2modes>>::new((n_mode - 1) * 7).gain(0.5);
     // Piston integral controller
     let piston_ctrl = Integrator::<Left<ResidualM2modes>>::new(7).gain(0.5);
     // Split piston from M2 modes
@@ -111,19 +111,23 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Scopes definition
+    let server = |port: u32| format!("172.31.26.127:{port}");
     let mut monitor = Monitor::new();
-    let segment_piston_scope =
-        Scope::<SegmentPiston<-9>>::builder("172.31.26.127:5001", &mut monitor)
-            .sampling_frequency(sampling_frequency as f64)
-            .build()?;
+    let segment_piston_scope = Scope::<SegmentPiston<-9>>::builder(server(5001), &mut monitor)
+        .sampling_frequency(sampling_frequency as f64)
+        .build()?;
     let segment_piston_recon_scope =
-        Scope::<NM<SegmentPistonRecon>>::builder("172.31.26.127:5002", &mut monitor)
+        Scope::<NM<SegmentPistonRecon>>::builder(server(5002), &mut monitor)
             .sampling_frequency(sampling_frequency as f64)
             .build()?;
     let segment_piston_int_scope =
-        Scope::<NM<SegmentPistonInt>>::builder("172.31.26.127:5004", &mut monitor)
+        Scope::<NM<SegmentPistonInt>>::builder(server(5004), &mut monitor)
             .sampling_frequency(sampling_frequency as f64)
             .build()?;
+    let n = optical_model.src.lock().unwrap().pupil_sampling();
+    let pupil_scope = Shot::<Wavefront>::builder(server(5005), &mut monitor, [n; 2])
+        .sampling_frequency(sampling_frequency as f64 / 50f64)
+        .build()?;
 
     let to_nm1 = Gain::new(vec![1e9; 7]);
     let to_nm3 = Gain::new(vec![1e9; 7]);
@@ -149,6 +153,7 @@ async fn main() -> anyhow::Result<()> {
         1: &merge("Merge piston\nwith other modes")[M2modes] -> &optical_model
         1: &piston_ctrl("Piston integral\ncontroller")[Right<ResidualM2modes>]!
             -> &to_nm3("nm")[NM<SegmentPistonInt>] -> &segment_piston_int_scope
+        50: &optical_model[Wavefront] -> &pupil_scope
     );
 
     // Diferential piston averager
@@ -187,11 +192,13 @@ async fn main() -> anyhow::Result<()> {
         25: piston_sensor("HDFS differential\npiston average")[SegmentAD7Piston]
             -> hdfs("HDFS piston\n> half a wave")[SegmentAD7Piston] -> once
         1: once[Offset<SegmentAD7Piston>] -> *piston_ctrl("Piston integral\ncontroller")
+        50: *optical_model[Wavefront] -> *pupil_scope
     );
 
     drop(segment_piston_scope);
     drop(segment_piston_recon_scope);
     drop(segment_piston_int_scope);
+    drop(pupil_scope);
     monitor.await?;
 
     Ok(())
