@@ -15,16 +15,14 @@ publish = false
 anyhow = "1.0.75"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
 gmt_dos-actors = "10.1"
-gmt_dos-clients = "3.2"
-interface = { version = "0.1", package = "gmt_dos-actors-clients_interface" }
-gmt_dos-clients_io = "3.1"
+gmt_dos-clients = "4.0"
+interface = { version = "1.0", package = "gmt_dos-actors-clients_interface" }
+gmt_dos-clients_io = "4.1"
 gmt_dos-clients_arrow = "2.0"
-gmt_dos-clients_crseo = "3.2"
-gmt_dos-clients_scope = { version = "2.3", features = ["server"] }
-gmt_dos-clients_scope-client = "0.1.0"
-crseo = "0.8.0"
-
-[patch.crates-io]
+gmt_dos-clients_crseo = "3.4"
+gmt_dos-clients_scope = { version = "3.0", features = ["server"] }
+gmt_dos-clients_scope-client = "0.2.1"
+crseo = "0.9.0"
 
 [profile.release]
-lto = "thin"
+lto = "fat"
