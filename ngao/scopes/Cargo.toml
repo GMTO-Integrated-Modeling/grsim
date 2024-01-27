@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-interface = { version = "0.1", package = "gmt_dos-actors-clients_interface" }
-gmt_dos-clients_io = "3.1"
+interface = { version = "1.0", package = "gmt_dos-actors-clients_interface" }
+gmt_dos-clients_io = "4.1"
 tokio = "1.34.0"
-gmt_dos-clients_scope-client = { version = "0.2.1", features = ["compress"] }
+gmt_dos-clients_scope-client = { version = "0.2.2", features = ["compress"] }
 
 
 [workspace]
