@@ -33,8 +33,8 @@ async fn main() -> anyhow::Result<()> {
     let sampling_frequency = 1000_usize;
 
     let n_lenslet = 92;
-    let m2_modes = "ASM_DDKLs_S7OC04184_675kls";
-    let n_mode: usize = 500;
+    // let (m2_modes, n_mode) = ("ASM_DDKLs_S7OC04184_675kls", 500);
+    let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
 
     // Pyramid definition
     let pym = Pyramid::builder()
@@ -46,37 +46,36 @@ async fn main() -> anyhow::Result<()> {
         .modulation(2., 64);
     // Optical Model (GMT with 1 guide star on-axis)
     let optical_model = OpticalModel::builder()
-        .gmt(Gmt::builder().m2(m2_modes, n_mode))
+        .gmt(
+            Gmt::builder()
+                .m1_truss_projection(false)
+                .m2(m2_modes, n_mode),
+        )
         .source(pym.guide_stars(None))
         // .atmosphere(atm_builder)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
     // Pyramid interaction matrix
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("examples")
-        .join("calibrating");
-    let mut pymtor: PyramidCalibrator = if !path.join("pymtor.pkl").exists() {
+    let file_name = format!("pymtor_{m2_modes}_{n_mode}.pkl");
+    let path = data_repo.join(file_name);
+    let mut pymtor: PyramidCalibrator = if !&path.exists() {
         let pymtor = PyramidCalibrator::builder(pym.clone(), m2_modes, n_mode)
             .n_thread(8)
             .build()?;
-        serde_pickle::to_writer(
-            &mut File::create(path.join("pymtor.pkl"))?,
-            &pymtor,
-            Default::default(),
-        )?;
+        serde_pickle::to_writer(&mut File::create(&path)?, &pymtor, Default::default())?;
         pymtor
     } else {
-        println!("Loading {:?}", path.join("pymtor.pkl"));
-        serde_pickle::from_reader(File::open(path.join("pymtor.pkl"))?, Default::default())?
+        println!("Loading {:?}", &path);
+        serde_pickle::from_reader(File::open(&path)?, Default::default())?
     };
     assert_eq!(n_mode, pymtor.n_mode);
     // Pyramid reconstructor
-    let pym_constrained_recon: nalgebra::DMatrix<f32> = serde_pickle::from_reader(
-        File::open(path.join("pym_constrained_recon.pkl"))?,
-        Default::default(),
-    )?;
-    pymtor.set_hp_estimator(pym_constrained_recon);
-    // pymtor.hp_estimator()?;
+    // let pym_constrained_recon: nalgebra::DMatrix<f32> = serde_pickle::from_reader(
+    //     File::open(data_repo.join(format!("pym_{m2_modes}_{n_mode}_constrained_recon.pkl")))?,
+    //     Default::default(),
+    // )?;
+    // pymtor.set_hp_estimator(pym_constrained_recon);
+    pymtor.hp_estimator()?;
     let calibrator: Calibration<PyramidCalibrator> = pymtor.clone().into();
 
     let pym = pym.build()?;
@@ -94,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     let stats = WavefrontStats::<1>::default();
 
     // Piston inputs
-    // let piston: Signals = Signals::new(7, 40).channel(0, Signal::Constant(25e-9));
+    // let piston: Signals = Signals::new(7, usize::MAX).channel(0, Signal::Constant(450e-9));
     let mut rng = WyRand::new(); //_seed(4237);
                                  // let mut random_piston = |a: f64| dbg!((2. * rng.generate::<f64>() - 1.) * a);
     let piston: Signals = (0..7).fold(Signals::new(7, usize::MAX), |signals, i| {

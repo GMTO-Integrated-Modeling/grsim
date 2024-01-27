@@ -20,7 +20,7 @@ gmt_dos-clients_io.workspace = true
 gmt_dos-clients_arrow.workspace = true
 gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
 crseo.workspace = true
-gmt_dos-clients_scope = { workspace = true, features = ["compress"] }
+gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
 nanorand = "0.7.0"
 serde-pickle = "1.1.1"
 nalgebra = "0.32.3"

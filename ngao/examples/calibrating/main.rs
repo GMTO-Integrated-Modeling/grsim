@@ -26,8 +26,8 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let n_lenslet = 92;
-    let m2_modes = "ASM_DDKLs_S7OC04184_675kls";
-    let n_mode: usize = 500; //env::var("N_KL_MODE").map_or_else(|_| 66, |x| x.parse::<usize>().unwrap());
+    // let (m2_modes, n_mode) = ("ASM_DDKLs_S7OC04184_675kls", 500);
+    let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
 
     let pym = Pyramid::builder()
         .lenslet_array(LensletArray {
@@ -40,18 +40,21 @@ async fn main() -> anyhow::Result<()> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
         .join("calibrating");
-    let mut pymtor: PyramidCalibrator = if !path.join("pymtor.pkl").exists() {
+    let file_name = format!("pymtor_{m2_modes}_{n_mode}.pkl");
+    let mut pymtor: PyramidCalibrator = if !path.join(&file_name).exists() {
         let pymtor = PyramidCalibrator::builder(pym.clone(), m2_modes, n_mode)
+            // .stroke(25e-10)
+            // .piston_mask_threshold(0.65)
             .n_gpu(8)
             .build()?;
         serde_pickle::to_writer(
-            &mut File::create(path.join("pymtor.pkl"))?,
+            &mut File::create(path.join(&file_name))?,
             &pymtor,
             Default::default(),
         )?;
         pymtor
     } else {
-        serde_pickle::from_reader(File::open(path.join("pymtor.pkl"))?, Default::default())?
+        serde_pickle::from_reader(File::open(path.join(&file_name))?, Default::default())?
     };
 
     let sampling_frequency = 100usize; // Hz
@@ -119,7 +122,8 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let pym_constrained_recon: nalgebra::DMatrix<f32> = serde_pickle::from_reader(
-        File::open(path.join("pym_constrained_recon_approx.pkl"))?,
+        // File::open(path.join("pym_constrained_recon.pkl"))?,
+        File::open(path.join("pym_M2_OrthoNormGS36_KarhunenLoeveModes_496_constrained_recon.pkl"))?,
         Default::default(),
     )?;
     dbg!(pym_constrained_recon.shape());
