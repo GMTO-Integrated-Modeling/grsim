@@ -130,9 +130,9 @@ async fn main() -> anyhow::Result<()> {
     // 1: m2_rbm[M2RigidBodyMotions]-> {gmt_servos::GmtM2Hex}
     // 1: asm_cmd[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
 
+    8: optical_model
     1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
     1: {gmt_servos::GmtFem}[M2RigidBodyMotions] -> optical_model
-    //8: optical_model[WfeRms<-6>]~
 
     40: optical_model[GuideStar].. -> stats
     40: stats[WfeRms<-9>].. -> wfe_rms_scope

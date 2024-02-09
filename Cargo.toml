@@ -1,5 +1,5 @@
 [workspace]
-members = ["open-loop", "ngao"]
+members = ["open-loop", "ngao", "ngao-opm"]
 resolver = "2"
 
 [workspace.package]
@@ -22,7 +22,7 @@ gmt_dos-clients_arrow = "2.0"
 gmt_dos-clients_crseo = "3.4"
 gmt_dos-clients_scope = { version = "3.0", features = ["server"] }
 gmt_dos-clients_scope-client = "0.2.1"
-crseo = "0.9.0"
+crseo = "0.9"
 
 [profile.release]
 lto = "fat"
