@@ -1,27 +1,29 @@
 use std::{env, path::Path};
 
 use crseo::{
-    //atmosphere,Atmosphere, 
-    FromBuilder, Gmt, wavefrontsensor::PhaseSensor
+    wavefrontsensor::PhaseSensor,
+    //atmosphere,Atmosphere,
+    FromBuilder,
+    Gmt,
 };
 use gmt_dos_actors::actorscript;
 //use gmt_dos_clients::{Tick, Timer};
 //use gmt_dos_clients::Weight;
-use gmt_dos_clients::Signals;//{OneSignal, Signal, Smooth};
+use gmt_dos_clients::Signals; //{OneSignal, Signal, Smooth};
+use gmt_dos_clients_crseo::OpticalModel;
 use gmt_dos_clients_io::{
     //cfd_wind_loads::{CFDM1WindLoads, CFDM2WindLoads, CFDMountWindLoads},
-    gmt_m1::{M1RigidBodyMotions},
+    gmt_m1::M1RigidBodyMotions,
     gmt_m2::{
+        asm::{segment::FaceSheetFigure, M2ASMAsmCommand},
         M2RigidBodyMotions,
-        asm::{M2ASMAsmCommand, segment::FaceSheetFigure},
-        },
+    },
     //mount::MountSetPoint,
-    optics::{Wavefront},//WfeRms,SegmentWfeRms
+    optics::Wavefront, //WfeRms,SegmentWfeRms
 };
-use gmt_dos_clients_servos::{asms_servo, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms};
-use gmt_dos_clients_crseo::OpticalModel; //GuideStar
-//use gmt_dos_clients_scope::server::{Monitor, Scope};
-//use gmt_dos_clients_windloads::CfdLoads;
+use gmt_dos_clients_servos::{asms_servo, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms}; //GuideStar
+                                                                                        //use gmt_dos_clients_scope::server::{Monitor, Scope};
+                                                                                        //use gmt_dos_clients_windloads::CfdLoads;
 use gmt_fem::FEM;
 use interface::{units::MuM, Size, Write};
 use matio_rs::MatFile;
@@ -54,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     let fem = FEM::from_env()?;
     let fem_var = env::var("FEM_REPO").expect("`FEM_REPO` is not set!");
     let fem_path = Path::new(&fem_var);
-    
+
     // M2 modal basis
     let (m2_modes, n_mode) = ("ASM_IFs", 675);
     //let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
@@ -67,10 +69,10 @@ async fn main() -> anyhow::Result<()> {
             .duration(5f64)
             .filepath(&data_repo.join("atmosphere.bin")),
     );*/
-    
-    let optical_model: OpticalModel = OpticalModel::<PhaseSensor>::builder()//
-         .gmt(Gmt::builder().m2(m2_modes, n_mode))
-         .build()?;
+
+    let optical_model: OpticalModel = OpticalModel::<PhaseSensor>::builder() //
+        .gmt(Gmt::builder().m2(m2_modes, n_mode))
+        .build()?;
 
     // The CFD wind loads must be called next afer the FEM as it is modifying
     /*
@@ -108,44 +110,51 @@ async fn main() -> anyhow::Result<()> {
     // ASMS modal commands
     let mut modes = vec![vec![0f64; n_mode]; 7];
     [3, 27, 75, 147, 243, 383, 507, 675]
-         .into_iter()
-         .for_each(|i| {
-             modes[0][i - 1] = 1e-6;
-             modes[2][i - 1] = 1e-6;
-             modes[6][i - 1] = 1e-6;
-         });
-     let asms_cmd: Signals<_> =
-         Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step));
-    /*
-    let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
+        .into_iter()
+        .for_each(|i| {
+            modes[0][i - 1] = 1e-6;
+            modes[2][i - 1] = 1e-6;
+            modes[6][i - 1] = 1e-6;
+        });
+    let asms_cmd: Signals<_> =
+        Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step));
+
+    /*     let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
     let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
-                 .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
-                 .collect();
+        .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
+        .collect();
     let asms_mode_cmd_vec: Vec<usize> = vec![7, 6, 5, 4, 3, 2, 1];
     let asms_cmd_vec: Vec<_> = kl_mat
         .into_iter()
         .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
-        .flat_map(|(kl_mat, i)| { 
-            kl_mat.column(i-1).as_slice().to_vec()
+        .flat_map(|(kl_mat, i)| {
+            kl_mat
+                .column(i - 1)
+                .as_slice()
+                .iter()
+                .map(|x| x * 1e-7)
+                .collect::<Vec<f64>>()
         })
         .collect();
-    let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step));
-    */
+    dbg!(asms_cmd_vec.len());
+    let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step)); */
+
     //let asms_cmd: Signals<_> = Signals::new(675 * 7, n_step);
 
-    /*
     let gmt_servos =
         GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-            .asms_servo(AsmsServo::new().facesheet(
-                asms_servo::Facesheet::new()
-                        .transforms(fem_path.join("asms_Pmats_20230131_1605.mat"),"Pmat"),
-            ))
+            .asms_servo(
+                AsmsServo::new().facesheet(
+                    asms_servo::Facesheet::new()
+                        .transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "Pmat"),
+                ),
+            )
             .build()?;
-    */
-    let gmt_servos =
-        GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-            .asms_servo(AsmsServo::new().facesheet(Default::default()))
-            .build()?;
+
+    // let gmt_servos =
+    //     GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
+    //         .asms_servo(AsmsServo::new().facesheet(Default::default()))
+    //         .build()?;
 
     /*
     // Scopes definition
@@ -170,7 +179,7 @@ async fn main() -> anyhow::Result<()> {
 
     // 1: m1_rbm[assembly::M1RigidBodyMotions] -> {gmt_servos::GmtM1}
     // 1: actuators[assembly::M1ActuatorCommandForces] -> {gmt_servos::GmtM1}
-    // 1: m2_rbm[M2RigidBodyMotions]-> {gmt_servos::GmtM2Hex}  
+    // 1: m2_rbm[M2RigidBodyMotions]-> {gmt_servos::GmtM2Hex}
     */
     1: asms_cmd[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
     8: optical_model
@@ -191,6 +200,6 @@ async fn main() -> anyhow::Result<()> {
     let n_px = (<OpticalModel as Size<Wavefront>>::len(&mut opm) as f64).sqrt() as usize;
 
     let _: complot::Heatmap = ((phase.as_arc().as_slice(), (n_px, n_px)), None).into();
-    
+
     Ok(())
 }
