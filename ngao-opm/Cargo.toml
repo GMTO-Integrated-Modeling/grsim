@@ -14,15 +14,21 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+complot = "0.3.4"
 crseo.workspace = true
+env_logger = "0.11.3"
 gmt-fem = "5.1.0"
 gmt_dos-actors.workspace = true
 gmt_dos-clients.workspace = true
+gmt_dos-clients_arrow.workspace = true
 gmt_dos-clients_crseo.workspace = true
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_scope = { workspace = true, features = ["server"] }
-gmt_dos-clients_servos = { version = "0.1.0", default-features = false, features = ["s8000d002ze30"] }
+gmt_dos-clients_servos = { version = "1.1.0", default-features = false, features = ["s8000d002ze30"] }
 gmt_dos-clients_windloads = "2.0.2"
+interface.workspace = true
+matio-rs = "1.3.1"
+nalgebra = "0.32.4"
 tokio.workspace = true
 
 [[bin]]

@@ -108,22 +108,31 @@ async fn main() -> anyhow::Result<()> {
 
     // let m2_rbm: Signals<_> = Signals::new(6 * 7, n_step);
     // ASMS modal commands
+    /*
     let mut modes = vec![vec![0f64; n_mode]; 7];
-    [3, 27, 75, 147, 243, 383, 507, 675]
+    [331,332,333,334,335,336,337,338,339,340,341,342,343,344,345]
+        .into_iter()
+        .for_each(|i| {
+            modes[1][i - 1] = 1e-6;
+            modes[3][i - 1] = 1e-6;
+            modes[5][i - 1] = 1e-6;
+        });        
+    [117,220,225,244,313,321,463,472,474,526,547,578,603,605,631]
         .into_iter()
         .for_each(|i| {
             modes[0][i - 1] = 1e-6;
             modes[2][i - 1] = 1e-6;
-            modes[6][i - 1] = 1e-6;
+            modes[4][i - 1] = 1e-6;
         });
     let asms_cmd: Signals<_> =
         Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step));
-
-    /*     let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
+     */
+    
+    let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
     let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
         .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
         .collect();
-    let asms_mode_cmd_vec: Vec<usize> = vec![7, 6, 5, 4, 3, 2, 1];
+    let asms_mode_cmd_vec: Vec<usize> = vec![1, 8, 9, 1, 1, 1, 3];
     let asms_cmd_vec: Vec<_> = kl_mat
         .into_iter()
         .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
@@ -137,8 +146,8 @@ async fn main() -> anyhow::Result<()> {
         })
         .collect();
     dbg!(asms_cmd_vec.len());
-    let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step)); */
-
+    let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step)); 
+     
     //let asms_cmd: Signals<_> = Signals::new(675 * 7, n_step);
 
     let gmt_servos =
@@ -146,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
             .asms_servo(
                 AsmsServo::new().facesheet(
                     asms_servo::Facesheet::new()
-                        .transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "Pmat"),
+                        .transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "PmatT"),
                 ),
             )
             .build()?;
@@ -194,6 +203,12 @@ async fn main() -> anyhow::Result<()> {
     1: {gmt_servos::GmtFem}[FaceSheetFigure<7>] -> optical_model
 
     );
+
+    // let metronome: Timer = Timer::new(0);
+    // actorscript!(
+    //     #[model(name=wavefront)]
+    //     1: metronome[Tick] -> optical_model[Wavefront]!$
+    // );
 
     let mut opm = optical_model.lock().await;
     let phase = <OpticalModel as Write<MuM<Wavefront>>>::write(&mut opm).unwrap();
