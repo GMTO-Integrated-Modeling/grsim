@@ -32,7 +32,7 @@ use gmt_dos_clients_io::{
 //use gmt_dos_clients_windloads::CfdLoads;
 
 use gmt_dos_clients_servos::{asms_servo, asms_servo::ReferenceBody, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms};
-                                                                                use gmt_fem::FEM;
+use gmt_fem::FEM;
 use interface::{units::MuM, Size, Write,
     filing::Filing};
 #[cfg(feature = "modal_asm_cmd")]
