@@ -3,7 +3,7 @@
 //
 
 /*
-FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release
+FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release --features modal_asm_cmd
 */
 
 use std::{env, path::Path};
@@ -14,10 +14,10 @@ use crseo::{
     FromBuilder,
     Gmt,
 };
-use gmt_dos_actors::actorscript;
-//use gmt_dos_clients::{Tick, Timer};
+use gmt_dos_actors::{actorscript, system::Sys};
+use gmt_dos_clients::{Tick, Timer};
 //use gmt_dos_clients::Weight;
-use gmt_dos_clients::Signals; //{OneSignal, Signal, Smooth};
+use gmt_dos_clients::Signals;
 use gmt_dos_clients_crseo::OpticalModel;
 use gmt_dos_clients_io::{
     //cfd_wind_loads::{CFDM1WindLoads, CFDM2WindLoads, CFDMountWindLoads},
@@ -29,11 +29,13 @@ use gmt_dos_clients_io::{
     //mount::MountSetPoint,
     optics::Wavefront, //WfeRms,SegmentWfeRms
 };
-use gmt_dos_clients_servos::{asms_servo, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms}; //GuideStar
-                                                                                        //use gmt_dos_clients_scope::server::{Monitor, Scope};
-                                                                                        //use gmt_dos_clients_windloads::CfdLoads;
-use gmt_fem::FEM;
-use interface::{units::MuM, Size, Write};
+//use gmt_dos_clients_windloads::CfdLoads;
+
+use gmt_dos_clients_servos::{asms_servo, asms_servo::ReferenceBody, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms};
+                                                                                use gmt_fem::FEM;
+use interface::{units::MuM, Size, Write,
+    filing::Filing};
+#[cfg(feature = "modal_asm_cmd")]
 use matio_rs::MatFile;
 use nalgebra as na;
 
@@ -87,80 +89,58 @@ async fn main() -> anyhow::Result<()> {
         .gmt(Gmt::builder().m2(m2_modes, n_mode))
         .build()?;
 
-    // The CFD wind loads must be called next afer the FEM as it is modifying
-    /*
-    // the FEM CFDMountWindLoads inputs
-    let cfd_loads = CfdLoads::foh(".", sim_sampling_frequency)
-        .duration(sim_duration as f64)
-        .mount(&mut fem, 0, None)
-        .m1_segments()
-        .m2_segments()
-        .build()?;
-    */
     // MOUNT SET POINT
     // let setpoint = Signals::new(3, n_step); //.channel(1, Signal::Constant(1f64.from_arcsec()));
 
     // ...
-    //let stats = WavefrontStats::<1>::default();
-
-    /*
-    let sigmoid = OneSignal::try_from(Signals::new(1, n_step).channel(
-        0,
-        Signal::Sigmoid {
-            amplitude: 1f64,
-            sampling_frequency_hz: sim_sampling_frequency as f64,
-        },
-    ))?;
-    */
-    //let m1_smoother = Smooth::new();
-    //let m2_smoother = Smooth::new();
-    //let mount_smoother = Smooth::new();
 
     // let actuators = Signals::new(6 * 335 + 306, n_step);
     // let m1_rbm = Signals::new(6 * 7, n_step);
-
     // let m2_rbm: Signals<_> = Signals::new(6 * 7, n_step);
-    // ASMS modal commands
-    let mut modes = vec![vec![0f64; n_mode]; 7];
-    [331,332,333,334,335,336,337,338,339,340,341,342,343,344,345]
-        .into_iter()
-        .for_each(|i| {
-            modes[1][i - 1] = 1e-6;
-            modes[3][i - 1] = 1e-6;
-            modes[5][i - 1] = 1e-6;
-        });        
-    [117,220,225,244,313,321,463,472,474,526,547,578,603,605,631]
-        .into_iter()
-        .for_each(|i| {
-            modes[0][i - 1] = 1e-6;
-            modes[2][i - 1] = 1e-6;
-            modes[4][i - 1] = 1e-6;
-        });
-    let asms_cmd: Signals<_> =
-        Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step));
-    
-    /*
-    let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
-    let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
-        .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
-        .collect();
-    let asms_mode_cmd_vec: Vec<usize> = vec![2, 3, 3, 2, 2, 3, 3];
-    let asms_cmd_vec: Vec<_> = kl_mat
-        .into_iter()
-        .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
-        .flat_map(|(kl_mat, i)| {
-            kl_mat
-                .column(i - 1)
-                .as_slice()
-                .iter()
-                .map(|x| x * 1e-7)
-                .collect::<Vec<f64>>()
-        })
-        .collect();
-    dbg!(asms_cmd_vec.len());
-    let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step)); 
-    */
 
+    // ASMS modal commands
+    let asms_cmd: Signals<_> = if cfg!(feature="modal_asm_cmd") {
+        let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
+        let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
+            .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
+            .collect();
+        //let asms_mode_cmd_vec: Vec<usize> = vec![2, 3, 4, 1, 6, 7, 4];
+        let asms_mode_cmd_vec: Vec<usize> = vec![8, 9, 10, 4, 11, 12, 1];        
+        let asms_cmd_vec: Vec<_> = kl_mat
+            .into_iter()
+            .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
+            .flat_map(|(kl_mat, i)| {
+                kl_mat
+                    .column(i - 1)
+                    .as_slice()
+                    .iter()
+                    .map(|x| x * 1e-7)
+                    .collect::<Vec<f64>>()
+            })
+            .collect();
+        dbg!("Using modal ASMS command.");
+        dbg!(asms_cmd_vec.len());
+        Signals::from((asms_cmd_vec, n_step))
+    } else {
+        let mut modes = vec![vec![0f64; n_mode]; 7];
+        [331,332,333,334,335,336,337,338,339,340,341,342,343,344,345]
+            .into_iter()
+            .for_each(|i| {
+                modes[1][i - 1] = 1e-6;
+                modes[3][i - 1] = 1e-6;
+                modes[5][i - 1] = 1e-6;
+            });        
+        [117,220,225,244,313,321,463,472,474,526,547,578,603,605,631]
+            .into_iter()
+            .for_each(|i| {
+                modes[0][i - 1] = 1e-6;
+                modes[2][i - 1] = 1e-6;
+                modes[4][i - 1] = 1e-6;
+            });
+        modes[4][312] = 0f64;
+        modes[4][375] = 1e-6;
+        Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step))
+    };
     //let asms_cmd: Signals<_> = Signals::new(675 * 7, n_step);
 
     /*
@@ -175,11 +155,21 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .build()?;
      */
-    
-    let gmt_servos = 
-        GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-            .asms_servo(AsmsServo::new().facesheet(Default::default()))
-            .build()?;
+
+    let gmt_servos = Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_data_repo_or_else(
+        "servos.bin",
+        || {
+            GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(
+                sim_sampling_frequency as f64,
+                fem,
+            )
+            //.wind_loads(WindLoads::new())
+            .asms_servo(AsmsServo::new()
+                .facesheet(Default::default())
+                .reference_body(ReferenceBody::new())
+            )
+        },
+    )?;
 
     actorscript! (
     // 1: setpoint[MountSetPoint] -> {gmt_servos::GmtMount}
@@ -205,17 +195,17 @@ async fn main() -> anyhow::Result<()> {
     1: {gmt_servos::GmtFem}[FaceSheetFigure<5>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<6>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<7>] -> optical_model
-    1: {gmt_servos::GmtFem}[M1RigidBodyMotions]$ -> optical_model
-    1: {gmt_servos::GmtFem}[M2RigidBodyMotions]$ -> optical_model
-    //1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
+    1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
+    1: {gmt_servos::GmtFem}[M2RigidBodyMotions] -> optical_model
+    1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
 
     );
 
-    // let metronome: Timer = Timer::new(0);
-    // actorscript!(
-    //     #[model(name=wavefront)]
-    //     1: metronome[Tick] -> optical_model[Wavefront]!$
-    // );
+    let metronome: Timer = Timer::new(0);
+    actorscript!(
+         #[model(name=wavefront)]
+         1: metronome[Tick] -> optical_model[Wavefront]!$
+     );
 
     let mut opm = optical_model.lock().await;
     let phase = <OpticalModel as Write<MuM<Wavefront>>>::write(&mut opm).unwrap();
