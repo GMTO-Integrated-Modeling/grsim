@@ -1,3 +1,11 @@
+//
+//
+//
+
+/*
+FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release
+*/
+
 use std::{env, path::Path};
 
 use crseo::{
@@ -15,7 +23,7 @@ use gmt_dos_clients_io::{
     //cfd_wind_loads::{CFDM1WindLoads, CFDM2WindLoads, CFDMountWindLoads},
     gmt_m1::M1RigidBodyMotions,
     gmt_m2::{
-        asm::{segment::FaceSheetFigure, M2ASMAsmCommand},
+        asm::{segment::FaceSheetFigure, M2ASMAsmCommand, M2ASMReferenceBodyNodes},
         M2RigidBodyMotions,
     },
     //mount::MountSetPoint,
@@ -31,9 +39,14 @@ use nalgebra as na;
 
 const ACTUATOR_RATE: usize = 80;
 
-/*
-FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release
-*/
+#[derive(Debug, Clone)]
+struct MyFacesheet;
+impl asms_servo::FacesheetOptions for MyFacesheet {
+    fn remove_rigid_body_motions(&self) -> bool {
+        false
+    }
+}
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -58,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
     let fem_path = Path::new(&fem_var);
 
     // M2 modal basis
-    let (m2_modes, n_mode) = ("ASM_IFs", 675);
+    let (m2_modes, n_mode) = ("ASM_IFs_permutated", 675);
     //let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
 
     /*
@@ -108,7 +121,6 @@ async fn main() -> anyhow::Result<()> {
 
     // let m2_rbm: Signals<_> = Signals::new(6 * 7, n_step);
     // ASMS modal commands
-    /*
     let mut modes = vec![vec![0f64; n_mode]; 7];
     [331,332,333,334,335,336,337,338,339,340,341,342,343,344,345]
         .into_iter()
@@ -126,13 +138,13 @@ async fn main() -> anyhow::Result<()> {
         });
     let asms_cmd: Signals<_> =
         Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step));
-     */
     
+    /*
     let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
     let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
         .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
         .collect();
-    let asms_mode_cmd_vec: Vec<usize> = vec![1, 8, 9, 1, 1, 1, 3];
+    let asms_mode_cmd_vec: Vec<usize> = vec![2, 3, 3, 2, 2, 3, 3];
     let asms_cmd_vec: Vec<_> = kl_mat
         .into_iter()
         .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
@@ -147,34 +159,28 @@ async fn main() -> anyhow::Result<()> {
         .collect();
     dbg!(asms_cmd_vec.len());
     let asms_cmd: Signals<_> = Signals::from((asms_cmd_vec, n_step)); 
-     
+    */
+
     //let asms_cmd: Signals<_> = Signals::new(675 * 7, n_step);
 
+    /*
     let gmt_servos =
+            GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
+                .asms_servo(
+                    AsmsServo::new().facesheet(
+                        asms_servo::Facesheet::new()
+                            //.transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "PmatT")
+                            //.options(Box::new(MyFacesheet))
+                    ),
+                )
+                .build()?;
+     */
+    
+    let gmt_servos = 
         GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-            .asms_servo(
-                AsmsServo::new().facesheet(
-                    asms_servo::Facesheet::new()
-                        .transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "PmatT"),
-                ),
-            )
+            .asms_servo(AsmsServo::new().facesheet(Default::default()))
             .build()?;
 
-    // let gmt_servos =
-    //     GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-    //         .asms_servo(AsmsServo::new().facesheet(Default::default()))
-    //         .build()?;
-
-    /*
-    // Scopes definition
-    let mut monitor = Monitor::new();
-    let segment_wfe_rms_scope = Scope::<SegmentWfeRms<-9>>::builder(&mut monitor)
-        .sampling_frequency(sim_sampling_frequency as f64)
-        .build()?;
-    let wfe_rms_scope = Scope::<WfeRms<-9>>::builder(&mut monitor)
-        .sampling_frequency(sim_sampling_frequency as f64)
-        .build()?;
-    */
     actorscript! (
     // 1: setpoint[MountSetPoint] -> {gmt_servos::GmtMount}
 
@@ -192,15 +198,16 @@ async fn main() -> anyhow::Result<()> {
     */
     1: asms_cmd[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
     8: optical_model
-    1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
-    1: {gmt_servos::GmtFem}[M2RigidBodyMotions] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<1>]${675} -> optical_model
+    1: {gmt_servos::GmtFem}[FaceSheetFigure<1>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<2>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<3>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<4>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<5>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<6>] -> optical_model
     1: {gmt_servos::GmtFem}[FaceSheetFigure<7>] -> optical_model
+    1: {gmt_servos::GmtFem}[M1RigidBodyMotions]$ -> optical_model
+    1: {gmt_servos::GmtFem}[M2RigidBodyMotions]$ -> optical_model
+    //1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
 
     );
 
