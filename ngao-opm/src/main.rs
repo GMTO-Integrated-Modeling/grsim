@@ -21,6 +21,7 @@ use gmt_dos_clients_crseo::{
     ResidualM2modes,
 };
 use gmt_dos_clients_io::{
+    gmt_m1::M1RigidBodyMotions,
     gmt_m2::{
         asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure, M2ASMReferenceBodyNodes},
         M2RigidBodyMotions,
@@ -131,21 +132,21 @@ async fn main() -> anyhow::Result<()> {
     let prt = Print::default();
 
     actorscript! (
-       8: metronome[Tick]
-           -> optical_model[DetectorFrame]
-                -> processor[PyramidMeasurements]
-                    -> calibrator[ResidualM2modes]
-                        -> pym_ctrl[M2modes]!
-                           -> modes2actuators
+        8: metronome[Tick]
+            -> optical_model[DetectorFrame]
+                 -> processor[PyramidMeasurements]
+                     -> calibrator[ResidualM2modes]
+                         -> pym_ctrl[M2modes]!
+                            -> modes2actuators
 
-       1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
-       1: {gmt_servos::GmtFem}[M2ASMFaceSheetFigure] -> optical_model
+        1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
+        1: {gmt_servos::GmtFem}[M2ASMFaceSheetFigure] -> optical_model
 
-       8: optical_model[WfeRms<-9>]$.. -> prt
-       8: optical_model[SegmentWfeRms<-9>]$.. -> prt
+        8: optical_model[WfeRms<-9>]$.. -> prt
+        8: optical_model[SegmentWfeRms<-9>]$.. -> prt
 
-       1: {gmt_servos::GmtFem}[M2RigidBodyMotions]$
-       1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
+        1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
+        1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes] -> optical_model
     );
 
     // let metronome: Timer = Timer::new(0);
