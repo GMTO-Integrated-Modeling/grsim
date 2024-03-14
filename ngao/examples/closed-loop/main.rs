@@ -1,17 +1,17 @@
-use std::{env, fs::File, path::Path};
+use std::{env, path::Path};
 
 use crseo::{
     atmosphere,
     wavefrontsensor::{LensletArray, Pyramid},
-    Atmosphere, Builder, FromBuilder, Gmt, WavefrontSensorBuilder,
+    Atmosphere, FromBuilder, Gmt, WavefrontSensorBuilder,
 };
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{Integrator, Timer};
 use gmt_dos_clients_crseo::{
-    Calibration, DetectorFrame, GuideStar, OpticalModel, Processor, PyramidCalibrator,
-    PyramidMeasurements, ResidualM2modes, WavefrontSensor, WavefrontStats,
+    Calibration, DetectorFrame, OpticalModel, Processor, PyramidCalibrator, PyramidMeasurements,
+    ResidualM2modes,
 };
-use gmt_dos_clients_io::optics::{M2modes, SegmentWfeRms, Wavefront, WfeRms};
+use gmt_dos_clients_io::optics::{M2modes, SegmentWfeRms, WfeRms};
 use gmt_dos_clients_scope::server::{Monitor, Scope};
 use interface::Tick;
 
@@ -20,10 +20,6 @@ async fn main() -> anyhow::Result<()> {
     let data_repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
     dbg!(&data_repo);
     env::set_var("DATA_REPO", &data_repo);
-    env::set_var(
-        "GMT_MODES_PATH",
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../data"),
-    );
 
     // Simulation sampling frequency (1kHz)
     let sampling_frequency = 1000_usize;
@@ -59,10 +55,8 @@ async fn main() -> anyhow::Result<()> {
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
     // Pyramid interaction matrix
-    let file_name = format!("pymtor_{m2_modes}_{n_mode}.pkl");
-    let path = data_repo.join(file_name);
     let calibrator: Calibration<PyramidCalibrator> = {
-        let filename = format! {"../data/pym-{m2_modes}-{n_mode}.bin"};
+        let filename = format!("{0}/pym-{m2_modes}-{n_mode}.bin", env!("GMT_MODES_PATH"));
         if let Ok(pymtor) = PyramidCalibrator::try_from(filename.as_str()) {
             pymtor
         } else {
@@ -102,17 +96,11 @@ async fn main() -> anyhow::Result<()> {
                     -> calibrator[ResidualM2modes]
                         -> pym_ctrl[M2modes]!
                              -> optical_model
-        // 1: optical_model[SegmentWfeRms<-9>].. -> segment_wfe_rms_scope
-        // 1: optical_model[WfeRms<-9>].. -> wfe_rms_scope
+        1: optical_model[SegmentWfeRms<-9>].. -> segment_wfe_rms_scope
+        1: optical_model[WfeRms<-9>].. -> wfe_rms_scope
     );
 
-    let metronome: Timer = Timer::new(0);
-    actorscript!(
-        #[model(name=wavefront)]
-        1: metronome[Tick] -> optical_model[Wavefront]!$
-    );
-
-    // monitor.await?;
+    monitor.await?;
 
     Ok(())
 }
