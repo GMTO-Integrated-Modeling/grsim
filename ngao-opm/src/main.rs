@@ -6,37 +6,31 @@
 FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release --features modal_asm_cmd
 */
 
-use std::{env, path::Path};
+use std::{env, error::Error, mem, path::Path, sync::Arc};
 
-use crseo::{
-    wavefrontsensor::PhaseSensor,
-    //atmosphere,Atmosphere,
-    FromBuilder,
-    Gmt,
-};
 use gmt_dos_actors::{actorscript, system::Sys};
-use gmt_dos_clients::{Tick, Timer};
 //use gmt_dos_clients::Weight;
-use gmt_dos_clients::Signals;
-use gmt_dos_clients_crseo::OpticalModel;
-use gmt_dos_clients_io::{
-    //cfd_wind_loads::{CFDM1WindLoads, CFDM2WindLoads, CFDMountWindLoads},
-    gmt_m1::M1RigidBodyMotions,
-    gmt_m2::{
-        asm::{segment::FaceSheetFigure, M2ASMAsmCommand, M2ASMReferenceBodyNodes},
-        M2RigidBodyMotions,
-    },
-    //mount::MountSetPoint,
-    optics::Wavefront, //WfeRms,SegmentWfeRms
+use crseo::{
+    atmosphere,
+    wavefrontsensor::{LensletArray, Pyramid},
+    Atmosphere, FromBuilder, Gmt, WavefrontSensorBuilder,
 };
-//use gmt_dos_clients_windloads::CfdLoads;
-
-use gmt_dos_clients_servos::{asms_servo, asms_servo::ReferenceBody, AsmsServo, GmtFem, GmtM2, GmtServoMechanisms};
+use gmt_dos_clients::{print::Print, Integrator, Timer};
+use gmt_dos_clients_crseo::{
+    Calibration, DetectorFrame, OpticalModel, Processor, PyramidCalibrator, PyramidMeasurements,
+    ResidualM2modes,
+};
+use gmt_dos_clients_io::{
+    gmt_m2::asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure},
+    optics::{M2modes, SegmentWfeRms, Wavefront, WfeRms},
+};
+use gmt_dos_clients_servos::{
+    asms_servo::{self, ReferenceBody},
+    AsmsServo, GmtM2, GmtServoMechanisms,
+};
 use gmt_fem::FEM;
-use interface::{units::MuM, Size, Write,
-    filing::Filing};
-#[cfg(feature = "modal_asm_cmd")]
-use matio_rs::MatFile;
+use interface::{filing::Filing, units::MuM, Data, Read, Size, Tick, Update, Write};
+use matio_rs::{MatFile, MatioError};
 use nalgebra as na;
 
 const ACTUATOR_RATE: usize = 80;
@@ -49,6 +43,8 @@ impl asms_servo::FacesheetOptions for MyFacesheet {
     }
 }
 
+const N_MODE: usize = 500;
+const N_ACTUATOR: usize = 675;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -63,155 +59,150 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let sim_sampling_frequency = 8000;
-    //let optical_model_sampling_frequency = 1000;
+    let optical_model_sampling_frequency = 1000;
     //let sim_duration = 5_usize; // second
-    let n_step = 400; //sim_sampling_frequency * sim_duration;
-
-    // $FEM_REPO-related variables
-    let fem = FEM::from_env()?;
-    let fem_var = env::var("FEM_REPO").expect("`FEM_REPO` is not set!");
-    let fem_path = Path::new(&fem_var);
+    let n_step = 100; //sim_sampling_frequency * sim_duration;
 
     // M2 modal basis
-    let (m2_modes, n_mode) = ("ASM_IFs_permutated", 675);
-    //let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
+    let m2_modes = "M2_OrthoNormGS36p90_KarhunenLoeveModes";
 
-    /*
-    // Optical Model (GMT with 1 guide star on-axis)
-    // Atmospher builder
+    // Pyramid definition
+    let n_lenslet = 92;
+    let pym = Pyramid::builder()
+        .lenslet_array(LensletArray {
+            n_side_lenslet: n_lenslet,
+            n_px_lenslet: 10,
+            d: 0f64,
+        })
+        .modulation(2., 64);
+
+    let calibrator: Calibration<PyramidCalibrator> = {
+        let filename = format! {"../data/pym-{m2_modes}-{N_MODE}.bin"};
+        if let Ok(pymtor) = PyramidCalibrator::try_from(filename.as_str()) {
+            pymtor
+        } else {
+            let mut pymtor = PyramidCalibrator::builder(pym.clone(), m2_modes, N_MODE)
+                .n_thread(7)
+                .build()?;
+            pymtor.h00_estimator()?;
+            pymtor.save(filename)?
+        }
+        .into()
+    };
+    let processor: Processor<_> = Processor::try_from(&pym)?;
+    let pym_ctrl: Integrator<ResidualM2modes> =
+        Integrator::<ResidualM2modes>::new(N_MODE * 7).gain(0.5);
+
     let atm_builder = Atmosphere::builder().ray_tracing(
         atmosphere::RayTracing::default()
             .duration(5f64)
             .filepath(&data_repo.join("atmosphere.bin")),
-    );*/
-
-    let optical_model: OpticalModel = OpticalModel::<PhaseSensor>::builder() //
-        .gmt(Gmt::builder().m2(m2_modes, n_mode))
+    );
+    let optical_model = OpticalModel::<Pyramid>::builder()
+        .gmt(
+            Gmt::builder()
+                .m1_truss_projection(false)
+                .m2("ASM_IFs_permutated_90", N_ACTUATOR),
+        )
+        .source(pym.guide_stars(None))
+        .sensor(pym.clone())
+        .atmosphere(atm_builder)
+        .sampling_frequency(optical_model_sampling_frequency as f64)
         .build()?;
 
-    // MOUNT SET POINT
-    // let setpoint = Signals::new(3, n_step); //.channel(1, Signal::Constant(1f64.from_arcsec()));
-
-    // ...
-
-    // let actuators = Signals::new(6 * 335 + 306, n_step);
-    // let m1_rbm = Signals::new(6 * 7, n_step);
-    // let m2_rbm: Signals<_> = Signals::new(6 * 7, n_step);
-
-    // ASMS modal commands
-    let asms_cmd: Signals<_> = if cfg!(feature="modal_asm_cmd") {
-        let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
-        let kl_mat: Vec<na::DMatrix<f64>> = (1..=7)
-            .map(|i| mat_file.var(format!("KL_{i}")).unwrap())
-            .collect();
-        //let asms_mode_cmd_vec: Vec<usize> = vec![2, 3, 4, 1, 6, 7, 4];
-        let asms_mode_cmd_vec: Vec<usize> = vec![8, 9, 10, 4, 11, 12, 1];        
-        let asms_cmd_vec: Vec<_> = kl_mat
-            .into_iter()
-            .zip(asms_mode_cmd_vec.into_iter()) // Create the tuples (kl_mat[i], asms_mode_cmd_vec[i])
-            .flat_map(|(kl_mat, i)| {
-                kl_mat
-                    .column(i - 1)
-                    .as_slice()
-                    .iter()
-                    .map(|x| x * 1e-7)
-                    .collect::<Vec<f64>>()
-            })
-            .collect();
-        dbg!("Using modal ASMS command.");
-        dbg!(asms_cmd_vec.len());
-        Signals::from((asms_cmd_vec, n_step))
-    } else {
-        let mut modes = vec![vec![0f64; n_mode]; 7];
-        [331,332,333,334,335,336,337,338,339,340,341,342,343,344,345]
-            .into_iter()
-            .for_each(|i| {
-                modes[1][i - 1] = 1e-6;
-                modes[3][i - 1] = 1e-6;
-                modes[5][i - 1] = 1e-6;
-            });        
-        [117,220,225,244,313,321,463,472,474,526,547,578,603,605,631]
-            .into_iter()
-            .for_each(|i| {
-                modes[0][i - 1] = 1e-6;
-                modes[2][i - 1] = 1e-6;
-                modes[4][i - 1] = 1e-6;
-            });
-        modes[4][312] = 0f64;
-        modes[4][375] = 1e-6;
-        Signals::from((modes.into_iter().flatten().collect::<Vec<f64>>(), n_step))
-    };
-    //let asms_cmd: Signals<_> = Signals::new(675 * 7, n_step);
-
-    /*
     let gmt_servos =
-            GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
-                .asms_servo(
-                    AsmsServo::new().facesheet(
-                        asms_servo::Facesheet::new()
-                            //.transforms(fem_path.join("asms_Pmats_20230131_1605.mat"), "PmatT")
-                            //.options(Box::new(MyFacesheet))
-                    ),
-                )
-                .build()?;
-     */
-
-    let gmt_servos = Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_data_repo_or_else(
-        "servos.bin",
-        || {
+        Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_data_repo_or_else("servos.bin", || {
             GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(
                 sim_sampling_frequency as f64,
-                fem,
+                FEM::from_env().unwrap(),
             )
             //.wind_loads(WindLoads::new())
-            .asms_servo(AsmsServo::new()
-                .facesheet(Default::default())
-                .reference_body(ReferenceBody::new())
+            .asms_servo(
+                AsmsServo::new()
+                    .facesheet(Default::default())
+                    .reference_body(ReferenceBody::new()),
             )
-        },
-    )?;
+        })?;
+
+    let modes2actuators = ModalToZonal::new().unwrap();
+
+    let metronome: Timer = Timer::new(n_step);
+    let prt = Print::default();
 
     actorscript! (
-    // 1: setpoint[MountSetPoint] -> {gmt_servos::GmtMount}
+       8: metronome[Tick]
+           -> optical_model[DetectorFrame]
+                -> processor[PyramidMeasurements]
+                    -> calibrator[ResidualM2modes]
+                        -> pym_ctrl[M2modes]!
+                           -> modes2actuators
 
-    /*
-    1: cfd_loads[CFDM1WindLoads] -> m1_smoother
-    1: sigmoid[Weight] -> m1_smoother[CFDM1WindLoads] -> {gmt_servos::GmtFem}
-    1: cfd_loads[CFDM2WindLoads] -> m2_smoother
-    1: sigmoid[Weight] -> m2_smoother[CFDM2WindLoads] -> {gmt_servos::GmtFem}
-    1: cfd_loads[CFDMountWindLoads] -> mount_smoother
-    1: sigmoid[Weight] -> mount_smoother[CFDMountWindLoads] -> {gmt_servos::GmtFem}
+       1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
+       1: {gmt_servos::GmtFem}[M2ASMFaceSheetFigure] -> optical_model
 
-    // 1: m1_rbm[assembly::M1RigidBodyMotions] -> {gmt_servos::GmtM1}
-    // 1: actuators[assembly::M1ActuatorCommandForces] -> {gmt_servos::GmtM1}
-    // 1: m2_rbm[M2RigidBodyMotions]-> {gmt_servos::GmtM2Hex}
-    */
-    1: asms_cmd[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
-    8: optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<1>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<2>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<3>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<4>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<5>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<6>] -> optical_model
-    1: {gmt_servos::GmtFem}[FaceSheetFigure<7>] -> optical_model
-    1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
-    1: {gmt_servos::GmtFem}[M2RigidBodyMotions] -> optical_model
-    1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
-
+       8: optical_model[WfeRms<-9>]$.. -> prt
+       8: optical_model[SegmentWfeRms<-9>]$.. -> prt
     );
 
-    let metronome: Timer = Timer::new(0);
-    actorscript!(
-         #[model(name=wavefront)]
-         1: metronome[Tick] -> optical_model[Wavefront]!$
-     );
+    // let metronome: Timer = Timer::new(0);
+    // actorscript!(
+    //     #[model(name=wavefront)]
+    //     1: metronome[Tick] -> optical_model[Wavefront]!$
+    // );
 
     let mut opm = optical_model.lock().await;
-    let phase = <OpticalModel as Write<MuM<Wavefront>>>::write(&mut opm).unwrap();
-    let n_px = (<OpticalModel as Size<Wavefront>>::len(&mut opm) as f64).sqrt() as usize;
+    let phase = <OpticalModel<Pyramid> as Write<MuM<Wavefront>>>::write(&mut opm).unwrap();
+    let n_px = (<OpticalModel<Pyramid> as Size<Wavefront>>::len(&mut opm) as f64).sqrt() as usize;
 
     let _: complot::Heatmap = ((phase.as_arc().as_slice(), (n_px, n_px)), None).into();
 
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct ModalToZonal {
+    mats: Vec<na::DMatrix<f64>>,
+    modes: Arc<Vec<f64>>,
+    actuators: Vec<f64>,
+}
+
+impl ModalToZonal {
+    pub fn new() -> Result<Self, Box<dyn Error>> {
+        let fem_var = env::var("FEM_REPO").expect("`FEM_REPO` is not set!");
+        let fem_path = Path::new(&fem_var);
+        let mat_file = MatFile::load(&fem_path.join("KLmodesGS36p90.mat"))?;
+        Ok(Self {
+            mats: (1..=7)
+                .map(|i| mat_file.var::<_, na::DMatrix<f64>>(format!("KL_{i}")))
+                .collect::<Result<Vec<na::DMatrix<f64>>, MatioError>>()?,
+            modes: Arc::new(vec![0.0; N_MODE]),
+            actuators: vec![0.0; N_ACTUATOR],
+        })
+    }
+}
+
+impl Update for ModalToZonal {
+    fn update(&mut self) {
+        let _ = mem::replace(
+            &mut self.actuators,
+            self.modes
+                .chunks(N_MODE)
+                .zip(self.mats.iter())
+                .map(|(modes, mat)| mat * na::DVector::from_column_slice(modes))
+                .flat_map(|actuators| actuators.as_slice().to_vec())
+                .collect(),
+        );
+    }
+}
+
+impl Read<M2modes> for ModalToZonal {
+    fn read(&mut self, data: Data<M2modes>) {
+        self.modes = data.into_arc();
+    }
+}
+
+impl Write<M2ASMAsmCommand> for ModalToZonal {
+    fn write(&mut self) -> Option<Data<M2ASMAsmCommand>> {
+        Some(self.actuators.clone().into())
+    }
 }
