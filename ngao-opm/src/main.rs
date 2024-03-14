@@ -21,7 +21,10 @@ use gmt_dos_clients_crseo::{
     ResidualM2modes,
 };
 use gmt_dos_clients_io::{
-    gmt_m2::asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure},
+    gmt_m2::{
+        asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure, M2ASMReferenceBodyNodes},
+        M2RigidBodyMotions,
+    },
     optics::{M2modes, SegmentWfeRms, Wavefront, WfeRms},
 };
 use gmt_dos_clients_servos::{
@@ -53,10 +56,6 @@ async fn main() -> anyhow::Result<()> {
     let data_repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
     dbg!(&data_repo);
     env::set_var("DATA_REPO", &data_repo);
-    env::set_var(
-        "GMT_MODES_PATH",
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../data"),
-    );
 
     let sim_sampling_frequency = 8000;
     let optical_model_sampling_frequency = 1000;
@@ -77,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
         .modulation(2., 64);
 
     let calibrator: Calibration<PyramidCalibrator> = {
-        let filename = format! {"../data/pym-{m2_modes}-{N_MODE}.bin"};
+        let filename = format!("{0}/pym-{m2_modes}-{N_MODE}.bin", env!("GMT_MODES_PATH"));
         if let Ok(pymtor) = PyramidCalibrator::try_from(filename.as_str()) {
             pymtor
         } else {
@@ -110,8 +109,9 @@ async fn main() -> anyhow::Result<()> {
         .sampling_frequency(optical_model_sampling_frequency as f64)
         .build()?;
 
-    let gmt_servos =
-        Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_data_repo_or_else("servos.bin", || {
+    let gmt_servos = Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_path_or_else(
+        Path::new(env!("FEM_REPO")).join("servos.bin"),
+        || {
             GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(
                 sim_sampling_frequency as f64,
                 FEM::from_env().unwrap(),
@@ -122,7 +122,8 @@ async fn main() -> anyhow::Result<()> {
                     .facesheet(Default::default())
                     .reference_body(ReferenceBody::new()),
             )
-        })?;
+        },
+    )?;
 
     let modes2actuators = ModalToZonal::new().unwrap();
 
@@ -142,6 +143,9 @@ async fn main() -> anyhow::Result<()> {
 
        8: optical_model[WfeRms<-9>]$.. -> prt
        8: optical_model[SegmentWfeRms<-9>]$.. -> prt
+
+       1: {gmt_servos::GmtFem}[M2RigidBodyMotions]$
+       1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes]${42}
     );
 
     // let metronome: Timer = Timer::new(0);
