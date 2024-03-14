@@ -11,6 +11,7 @@ cargo run --release --bin optical_model
 use std::{env, path::Path};
 
 use crseo::{wavefrontsensor::PhaseSensor, FromBuilder, Gmt};
+use gmt_dos_clients::print;
 use gmt_dos_clients_crseo::OpticalModel;
 use gmt_dos_clients_io::optics::{M2modes, Wavefront};
 use interface::{units::MuM, Read, Size, Update, Write};
@@ -20,12 +21,16 @@ use nalgebra as na;
 const I: usize = 499;
 
 fn main() -> anyhow::Result<()> {
-    let seed = fastrand::u64(..2024);
-    dbg!(seed);
+    let main_rng = fastrand::Rng::with_seed(fastrand::u64(..2024));
+    let data_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("bin")
+        .join("optical_model");
     // M2_OrthoNormGS36p_KarhunenLoeveModes
     {
-        let mut rng = fastrand::Rng::with_seed(seed);
+        let mut rng = main_rng.clone();
         let (m2_modes, n_mode) = ("M2_OrthoNormGS36p90_KarhunenLoeveModes", 500);
+        println!("{m2_modes}");
         let mut opm = OpticalModel::<PhaseSensor>::builder()
             .gmt(
                 Gmt::builder()
@@ -52,14 +57,18 @@ fn main() -> anyhow::Result<()> {
 
         let _: complot::Heatmap = (
             (phase.as_arc().as_slice(), (n_px, n_px)),
-            Some(complot::Config::new().filename(format!("{m2_modes}.png"))),
+            Some(
+                complot::Config::new()
+                    .filename(data_path.join(format!("{m2_modes}.png")).to_str().unwrap()),
+            ),
         )
             .into();
     }
     // ASMS IFs (permutated)
     {
-        let mut rng = fastrand::Rng::with_seed(seed);
+        let mut rng = main_rng.clone();
         let (m2_modes, n_mode) = ("ASM_IFs_permutated_90", 675);
+        println!("{m2_modes}");
         let mut opm = OpticalModel::<PhaseSensor>::builder()
             .gmt(
                 Gmt::builder()
@@ -94,7 +103,10 @@ fn main() -> anyhow::Result<()> {
 
         let _: complot::Heatmap = (
             (phase.as_arc().as_slice(), (n_px, n_px)),
-            Some(complot::Config::new().filename(format!("{m2_modes}.png"))),
+            Some(
+                complot::Config::new()
+                    .filename(data_path.join(format!("{m2_modes}.png")).to_str().unwrap()),
+            ),
         )
             .into();
     }
