@@ -2,7 +2,7 @@
 Compare the wavefront using either the KL modes bases directly (from a ceo file)
 or using a linear combination of ASM influence functions
 ```
-export GMT_MODES_PATH=/home/ubuntu/projects/grsim/data/
+export GMT_MODES_PATH=<Folder with required .ceo>
 export FEM_REPO=~/mnt/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/
 cargo run --release --bin optical_model
 ```
@@ -11,14 +11,12 @@ cargo run --release --bin optical_model
 use std::{env, path::Path};
 
 use crseo::{wavefrontsensor::PhaseSensor, FromBuilder, Gmt};
-use gmt_dos_clients::print;
+//use gmt_dos_clients::print;
 use gmt_dos_clients_crseo::OpticalModel;
 use gmt_dos_clients_io::optics::{M2modes, Wavefront};
 use interface::{units::MuM, Read, Size, Update, Write};
 use matio_rs::MatFile;
 use nalgebra as na;
-
-const I: usize = 499;
 
 fn main() -> anyhow::Result<()> {
     let main_rng = fastrand::Rng::with_seed(fastrand::u64(..2024));
@@ -42,7 +40,7 @@ fn main() -> anyhow::Result<()> {
         let modes: Vec<_> = vec![vec![0f64; n_mode]; 7]
             .into_iter()
             .enumerate()
-            .flat_map(|(i, mut modes)| {
+            .flat_map(|(_i, mut modes)| {
                 modes[rng.usize(..500)] = 1e-7;
                 modes
             })

@@ -1,9 +1,10 @@
-//
-//
-//
+/*!
+Run an AO closed-loop simulation with atmospheric disturbances. The pyramid wavefront sensor measurement provides the feedback information. After reconstructing the residual wavefront modes (except for the segment piston), an integral controller computes the compensation commands sent to the ASMS.
 
-/*
-FEM_REPO=`pwd`/20230131_1605_zen_30_M1_202110_ASM_202208_Mount_202111/ cargo run --release --features modal_asm_cmd
+From the ngao-opm folder run the script `setup.sh`. Then, run the simulation using 
+```
+cargo run --release --bin servo_ao_py00
+```
 */
 
 use std::{env, error::Error, mem, path::Path, sync::Arc};
@@ -22,9 +23,8 @@ use gmt_dos_clients_crseo::{
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
-    gmt_m2::{
-        asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure, M2ASMReferenceBodyNodes},
-        M2RigidBodyMotions,
+    gmt_m2::{//M2RigidBodyMotions,
+        asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure, M2ASMReferenceBodyNodes},        
     },
     optics::{M2modes, SegmentWfeRms, Wavefront, WfeRms},
 };
@@ -63,10 +63,10 @@ async fn main() -> anyhow::Result<()> {
     //let sim_duration = 5_usize; // second
     let n_step = 100; //sim_sampling_frequency * sim_duration;
 
-    // M2 modal basis
+    // M2-ASMS modal basis
     let m2_modes = "M2_OrthoNormGS36p90_KarhunenLoeveModes";
 
-    // Pyramid definition
+    // Pyramid WFS definition
     let n_lenslet = 92;
     let pym = Pyramid::builder()
         .lenslet_array(LensletArray {
@@ -76,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
         })
         .modulation(2., 64);
 
+    // Residual mode reconstructor driven by PWFS measurements
     let calibrator: Calibration<PyramidCalibrator> = {
         let filename = format!("{0}/pym-{m2_modes}-{N_MODE}.bin", env!("GMT_MODES_PATH"));
         if let Ok(pymtor) = PyramidCalibrator::try_from(filename.as_str()) {
@@ -90,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
         .into()
     };
     let processor: Processor<_> = Processor::try_from(&pym)?;
+    // Wavefront (integral) controller
     let pym_ctrl: Integrator<ResidualM2modes> =
         Integrator::<ResidualM2modes>::new(N_MODE * 7).gain(0.5);
 
@@ -110,6 +112,7 @@ async fn main() -> anyhow::Result<()> {
         .sampling_frequency(optical_model_sampling_frequency as f64)
         .build()?;
 
+    // GMT Sevomechanisms actors
     let gmt_servos = Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::from_path_or_else(
         Path::new(env!("FEM_REPO")).join("servos.bin"),
         || {
@@ -126,12 +129,15 @@ async fn main() -> anyhow::Result<()> {
         },
     )?;
 
+    // Modal to zonal conversion
     let modes2actuators = ModalToZonal::new().unwrap();
 
     let metronome: Timer = Timer::new(n_step);
     let prt = Print::default();
 
+    // Simulation architecture
     actorscript! (
+    #[labels(processor = "Pyramid WFS", calibrator="PY00 Reconstructor")]
         8: metronome[Tick]
             -> optical_model[DetectorFrame]
                  -> processor[PyramidMeasurements]
