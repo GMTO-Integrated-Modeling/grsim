@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     let n_lenslet = 92;
     // let (m2_modes, n_mode) = ("ASM_DDKLs_S7OC04184_675kls", 500);
-    let (m2_modes, n_mode) = ("M2_OrthoNormGS36p_KarhunenLoeveModes", 500);
+    let (m2_modes, n_mode) = ("M2_OrthoNormGS36p90_KarhunenLoeveModes", 500);
 
     // Pyramid definition
     let pym = Pyramid::builder()
@@ -54,49 +54,79 @@ async fn main() -> anyhow::Result<()> {
             .duration(5f64)
             .filepath(&data_repo.join("atmosphere.bin")),
     );
-    let optical_model = OpticalModel::builder()
+    // .r0_at_zenith(1.);
+    let mut optical_model = OpticalModel::<Pyramid>::builder()
         .gmt(
             Gmt::builder()
                 .m1_truss_projection(false)
                 .m2(m2_modes, n_mode),
         )
         .source(pym.guide_stars(None))
+        .sensor(pym.clone())
+        .build()?;
+
+    // Conversion from wavefront segment piston to KL piston
+    let stroke = 1e-6;
+    println!("Piston scaling factor: (for HDFS)");
+    let data: Vec<_> = vec![vec![0f64; n_mode]; 7]
+        .into_iter()
+        .flat_map(|mut modes| {
+            modes[0] = stroke;
+            modes
+        })
+        .collect();
+    <OpticalModel<Pyramid> as Read<M2modes>>::read(&mut optical_model, Data::new(data));
+    optical_model.update();
+    let piston_scale: Vec<_> =
+        <OpticalModel<Pyramid> as Write<SegmentPiston>>::write(&mut optical_model)
+            .map(|sp| {
+                (*sp)
+                    .iter()
+                    .map(|sp| (sp / stroke).recip())
+                    .inspect(|x| println!("{}", x))
+                    .collect()
+            })
+            .unwrap();
+
+    let optical_model = OpticalModel::<Pyramid>::builder()
+        .gmt(
+            Gmt::builder()
+                .m1_truss_projection(false)
+                .m2(m2_modes, n_mode),
+        )
+        .source(pym.guide_stars(None))
+        .sensor(pym.clone())
         .atmosphere(atm_builder)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
-    // Pyramid interaction matrix
-    let file_name = format!("pymtor_{m2_modes}_{n_mode}.pkl");
-    let path = data_repo.join(file_name);
-    let mut pymtor: PyramidCalibrator = if !path.exists() {
-        let pymtor = PyramidCalibrator::builder(pym.clone(), m2_modes, n_mode)
-            .n_gpu(8)
-            .build()?;
-        serde_pickle::to_writer(&mut File::create(&path)?, &pymtor, Default::default())?;
-        pymtor
-    } else {
-        println!("Loading {:?}", &path);
-        serde_pickle::from_reader(File::open(&path)?, Default::default())?
-    };
-    assert_eq!(n_mode, pymtor.n_mode);
-    println!("{pymtor}");
 
-    let pym = pym.build()?;
+    // Pyramid interaction matrix
+    let mut pymtor = {
+        let filename = format!("{0}/pym-{m2_modes}-{n_mode}.bin", env!("GMT_MODES_PATH"));
+        if let Ok(pymtor) = PyramidCalibrator::try_from(filename.as_str()) {
+            pymtor
+        } else {
+            let mut pymtor = PyramidCalibrator::builder(pym.clone(), m2_modes, n_mode)
+                .n_gpu(7)
+                .stroke(25e-7)
+                .build()?;
+            pymtor.h00_estimator()?;
+            pymtor.save(filename)?
+        }
+    };
+
     // Pyramid data processor
-    let processor: Processor<_> = Processor::from(&pym);
-    // Pyramid wafefront sensor
-    let pyramid = WavefrontSensor::<_, 1>::new(pym);
+    let processor: Processor<_> = Processor::try_from(&pym)?;
     // Pyramid integral controller (modes>1)
     let pym_ctrl = Integrator::<Right<ResidualM2modes>>::new((n_mode - 1) * 7).gain(0.5);
     // Piston integral controller
     let piston_ctrl = Integrator::<Left<ResidualM2modes>>::new(7).gain(0.5);
     // Split piston from M2 modes
     let (split, merge) = leftright::split_merge_chunks_at::<ResidualM2modes, M2modes>(n_mode, 1);
-    // Wavefront statistics
-    let stats = WavefrontStats::<1>::default();
 
     // Piston inputs
-    // let piston: Signals = Signals::new(7, 40).channel(0, Signal::Constant(25e-9));
-    let mut rng = WyRand::new(); //_seed(4237);
+    let piston: Signals = Signals::new(7, 40).channel(0, Signal::Constant(25e-9));
+    /*     let mut rng = WyRand::new(); //_seed(4237);
                                  // let mut random_piston = |a: f64| dbg!((2. * rng.generate::<f64>() - 1.) * a);
     let piston: Signals = (0..7).fold(Signals::new(7, usize::MAX), |signals, i| {
         signals.channel(
@@ -109,7 +139,9 @@ async fn main() -> anyhow::Result<()> {
                     phase_s: rng.generate::<f64>(),
                 },
         )
-    });
+    }); */
+
+    let calibrator: Calibration<PyramidCalibrator> = pymtor.clone().into();
 
     // Scopes definition
     let server = |port: u32| format!("172.31.26.127:{port}");
@@ -123,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
     let segment_piston_int_scope = Scope::<NM<SegmentPistonInt>>::builder(&mut monitor)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
-    let n = optical_model.src.lock().unwrap().pupil_sampling();
+    let n = optical_model.src.borrow().pupil_sampling();
     let pupil_scope = Shot::<Wavefront>::builder(&mut monitor, [n; 2])
         .sampling_frequency(sampling_frequency as f64 / 50f64)
         .build()?;
@@ -138,37 +170,43 @@ async fn main() -> anyhow::Result<()> {
     let to_nm3 = Gain::new(vec![1e9; 7]);
 
     let metronome: Timer = Timer::new(100);
-    // Pyramid reconstructor
-    pymtor.h00_estimator()?;
-    let calibrator: Calibration<PyramidCalibrator> = pymtor.clone().into();
 
+    /*
+       CLOSED-LOOP PYRAMID ON MODES>1
+    */
     actorscript!(
         #[model(name=closed_loop_pyramid_wo_piston, )]
-        #[labels(metronome = "Metronome", calibrator = "Reconstructor", pym_ctrl="High-orders\nintegral controller")]
+        #[labels(metronome = "Metronome", calibrator = "Reconstructor",
+            pym_ctrl="High-orders\nintegral controller")]
         1: metronome[Tick] //-> &piston("Segment\nPiston")[SegmentPiston]
-            -> optical_model[GuideStar] -> stats[SegmentPiston<-9>] -> segment_piston_scope
-        1: stats[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
-        1: stats[WfeRms<-9>] -> wfe_rms_scope
-        1: optical_model[GuideStar]
-            -> pyramid[DetectorFrame<f32>]
-                -> processor[PyramidMeasurements] -> calibrator
-        1: calibrator[Right<ResidualM2modes>]
-            -> pym_ctrl[M2modes]!
-                 -> optical_model
+            -> optical_model[DetectorFrame]
+                -> processor[PyramidMeasurements]
+                    -> calibrator[ResidualM2modes]
+                        -> split[Right<ResidualM2modes>]
+                            -> pym_ctrl[M2modes]!
+                                -> optical_model
+        1: optical_model[SegmentPiston<-9>] -> segment_piston_scope
+        1: optical_model[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
+        1: optical_model[WfeRms<-9>] -> wfe_rms_scope
         50: optical_model[Wavefront] -> pupil_scope
     );
 
     let metronome: Timer = Timer::new(100);
     // Pyramid reconstructor
-    let pym_constrained_recon: nalgebra::DMatrix<f32> = serde_pickle::from_reader(
-        File::open(data_repo.join(format!("pym_{m2_modes}_{n_mode}_constrained_recon.pkl")))?,
-        Default::default(),
-    )?;
-    pymtor.set_hp_estimator(pym_constrained_recon);
+    // let pym_constrained_recon: nalgebra::DMatrix<f32> = serde_pickle::from_reader(
+    //     File::open(data_repo.join(format!("pym_{m2_modes}_{n_mode}_constrained_recon.pkl")))?,
+    //     Default::default(),
+    // )?;
+    // pymtor.set_hp_estimator(pym_constrained_recon);
+    pymtor.hp_estimator()?;
     let calibrator: Calibration<PyramidCalibrator> = pymtor.clone().into();
 
     // closed_loop_pyramid_wo_piston.await?;
 
+    /*
+       CLOSED-LOOP PYRAMID WITH 2 INTEGRAL CONTROLLERS
+       One controller for modes>1, the other for piston
+    */
     actorscript!(
         #[model(name=closed_loop_pyramid)]
         #[labels(metronome = "Metronome", calibrator = "Reconstructor",
@@ -178,15 +216,11 @@ async fn main() -> anyhow::Result<()> {
             merge = "Merge piston\nwith other modes",
             piston_ctrl = "Piston integral\ncontroller")]
         1: metronome[Tick] //-> &piston("Segment\nPiston")[SegmentPiston]
-            -> optical_model[GuideStar] -> stats[SegmentPiston<-9>] -> segment_piston_scope
-        1: stats[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
-        1: stats[WfeRms<-9>] -> wfe_rms_scope
-        1: optical_model[GuideStar]
-            -> pyramid[DetectorFrame<f32>]
-                -> processor[PyramidMeasurements] -> calibrator
-        1: calibrator[ResidualM2modes]
-            ->  split[Left<ResidualM2modes>]
-                -> to_nm1[NM<SegmentPistonRecon>] -> segment_piston_recon_scope
+            -> optical_model[DetectorFrame]
+                -> processor[PyramidMeasurements]
+                    -> calibrator[ResidualM2modes]
+                        ->  split[Left<ResidualM2modes>]
+                            -> to_nm1[NM<SegmentPistonRecon>] -> segment_piston_recon_scope
         1: split[Right<ResidualM2modes>]
             -> pym_ctrl[Right<ResidualM2modes>]!
                 -> merge
@@ -196,6 +230,9 @@ async fn main() -> anyhow::Result<()> {
         1: merge[M2modes] -> optical_model
         1: piston_ctrl[Right<ResidualM2modes>]!
             -> to_nm3[NM<SegmentPistonInt>] -> segment_piston_int_scope
+        1: optical_model[SegmentPiston<-9>] -> segment_piston_scope
+        1: optical_model[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
+        1: optical_model[WfeRms<-9>] -> wfe_rms_scope
         50: optical_model[Wavefront] -> pupil_scope
     );
 
@@ -207,10 +244,14 @@ async fn main() -> anyhow::Result<()> {
         .build()?;
     let metronome: Timer = Timer::new(800 + 4000);
     let once = Once::new();
-    let hdfs = HDFS::default();
+    let hdfs = HDFS::new(piston_scale);
 
     // closed_loop_pyramid.await?;
 
+    /*
+       CLOSED-LOOP PYRAMID WITH 2 INTEGRAL CONTROLLERS & HDFS WAVE CATCHER
+       One controller for modes>1, the other for piston
+    */
     actorscript!(
         #[model(name = closed_loop_pyramid_hdfs)]
         #[labels(metronome = "Metronome", calibrator = "Reconstructor",
@@ -222,15 +263,11 @@ async fn main() -> anyhow::Result<()> {
             piston_sensor = "HDFS differential\npiston average",
             hdfs = "HDFS piston\n> half a wave")]
         1: metronome[Tick] //-> *piston("Segment\nPiston")[SegmentPiston]
-            -> optical_model[GuideStar] -> stats[SegmentPiston<-9>] -> segment_piston_scope
-        1: stats[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
-        1: stats[WfeRms<-9>] -> wfe_rms_scope
-        1: optical_model[GuideStar]
-            -> pyramid[DetectorFrame<f32>]
-                -> processor[PyramidMeasurements] -> calibrator
-        1: calibrator[ResidualM2modes]
-            ->  split[Left<ResidualM2modes>]
-                -> to_nm1[NM<SegmentPistonRecon>] -> segment_piston_recon_scope
+            -> optical_model[DetectorFrame]
+                -> processor[PyramidMeasurements]
+                    -> calibrator[ResidualM2modes]
+                        -> split[Left<ResidualM2modes>]
+                            -> to_nm1[NM<SegmentPistonRecon>] -> segment_piston_recon_scope
         1: split[Right<ResidualM2modes>]
             -> pym_ctrl[Right<ResidualM2modes>]!
                 -> merge
@@ -238,9 +275,13 @@ async fn main() -> anyhow::Result<()> {
             -> piston_ctrl[Left<ResidualM2modes>]!
                 -> merge
         1: merge[M2modes] -> optical_model
+        1: optical_model[SegmentPiston<-9>] -> segment_piston_scope
+        1: optical_model[SegmentWfeRms<-9>] -> segment_wfe_rms_scope
+        1: optical_model[WfeRms<-9>] -> wfe_rms_scope
+
         1: piston_ctrl[Right<ResidualM2modes>]!
             -> to_nm3[NM<SegmentPistonInt>] -> segment_piston_int_scope
-        1:  stats[SegmentD7Piston] -> piston_sensor
+        1:  optical_model[SegmentD7Piston] -> piston_sensor
         150: hdfs[SegmentAD7Piston]
             -> to_nm2[SegmentAD7Piston] -> piston_sensor_scope
         150: piston_sensor[SegmentAD7Piston]
@@ -263,8 +304,16 @@ async fn main() -> anyhow::Result<()> {
 #[derive(Debug, Default)]
 pub struct HDFS {
     data: Arc<Vec<f64>>,
+    scale: Vec<f64>,
 }
-
+impl HDFS {
+    pub fn new(scale: Vec<f64>) -> Self {
+        Self {
+            data: Default::default(),
+            scale,
+        }
+    }
+}
 impl Update for HDFS {}
 impl Read<SegmentAD7Piston> for HDFS {
     fn read(&mut self, data: Data<SegmentAD7Piston>) {
@@ -276,7 +325,8 @@ impl Write<SegmentAD7Piston> for HDFS {
         let data: Vec<_> = self
             .data
             .iter()
-            .map(|x| if x.abs() > 250e-9 { *x } else { 0f64 })
+            .zip(&self.scale)
+            .map(|(x, s)| if x.abs() > 250e-9 { *x * s } else { 0f64 })
             .collect();
         // let mean = data.iter().sum::<f64>() / 7f64;
         // Some(
