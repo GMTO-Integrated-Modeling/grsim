@@ -22,7 +22,16 @@ gmt_dos-clients_arrow = "2.0"
 gmt_dos-clients_crseo = "4.3"
 gmt_dos-clients_scope = { version = "3.0", features = ["server"] }
 gmt_dos-clients_scope-client = "0.2.1"
+gmt_dos-clients_windloads = "2.0.3"
 crseo = "0.9"
+gmt-fem = "5.1.0"
 
 #[profile.release]
 #lto = "fat"
+
+[patch.crates-io]
+#gmt_dos-clients_windloads = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
+#gmt_dos-actors = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
+#gmt_dos-clients = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
+gmt_dos-actors-clients_interface = { git = 'https://github.com/rconan/dos-actors.git', branch = 'filing' }
+#gmt-fem = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }

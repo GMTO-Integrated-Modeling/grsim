@@ -18,7 +18,7 @@ complot = "0.3.4"
 crseo.workspace = true
 env_logger = "0.11.3"
 fastrand = "2.0.1"
-gmt-fem = "5.1.0"
+gmt-fem.workspace = true
 gmt_dos-actors.workspace = true
 gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
 gmt_dos-clients_arrow.workspace = true
@@ -26,7 +26,7 @@ gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
 gmt_dos-clients_servos = "2.0.0"
-gmt_dos-clients_windloads = "2.0.2"
+gmt_dos-clients_windloads.workspace = true
 interface.workspace = true
 matio-rs = "1.3.1"
 nalgebra = "0.32.4"
