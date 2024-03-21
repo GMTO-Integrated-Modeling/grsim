@@ -1,0 +1,41 @@
+#workspace = { members = ["scopes"] }
+[package]
+name = "ngao-opm"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+publish.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow.workspace = true
+complot = "0.3.4"
+crseo.workspace = true
+env_logger = "0.11.3"
+fastrand = "2.0.1"
+gmt-fem = "5.1.0"
+gmt_dos-actors.workspace = true
+gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
+gmt_dos-clients_arrow.workspace = true
+gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
+gmt_dos-clients_io.workspace = true
+gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
+gmt_dos-clients_servos = "2.0.0"
+gmt_dos-clients_windloads = "2.0.2"
+interface.workspace = true
+matio-rs = "1.3.1"
+nalgebra = "0.32.4"
+tokio.workspace = true
+
+[features]
+# Set ASM command using a modal basis
+modal_asm_cmd = []
+
+[[bin]]
+name = "ngao-opm"
+path = "src/main.rs"

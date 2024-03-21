@@ -9,3 +9,5 @@
 *.vscode
 *.pkl
 *.png
+ngao/scopes/target/*
+ngao-opm/scopes/target/*
