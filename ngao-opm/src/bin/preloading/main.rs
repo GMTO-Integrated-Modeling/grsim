@@ -37,7 +37,11 @@ async fn main() -> anyhow::Result<()> {
         let gmt_servos = Sys::<GmtServoMechanisms<ACTUATOR_RATE, 1>>::try_from(
             GmtServoMechanisms::<ACTUATOR_RATE, 1>::new(sim_sampling_frequency as f64, fem)
                 .wind_loads(WindLoads::new())
-                .asms_servo(AsmsServo::new().reference_body(ReferenceBody::new())),
+                .asms_servo(
+                    AsmsServo::new()
+                        .facesheet(Default::default())
+                        .reference_body(ReferenceBody::new()),
+                ),
         )?;
 
         (cfd_loads, gmt_servos)
