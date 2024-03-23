@@ -57,8 +57,8 @@ async fn main() -> anyhow::Result<()> {
     1: {cfd_loads::Mount}[CFDMountWindLoads] -> {gmt_servos::GmtFem}
     }
     let path = Path::new(env!("FEM_REPO"));
-    gmt_servos.to_path(path.join("preloaded_servos_zen30az000_OS7.bin"))?;
-    cfd_loads.to_path(path.join("preloaded_windloads_zen30az000_OS7.bin"))?;
+    gmt_servos.to_path(path.join("preloaded_servos_zen30az000_OS7_1.bin"))?;
+    cfd_loads.to_path(path.join("preloaded_windloads_zen30az000_OS7_1.bin"))?;
 
     Ok(())
 }
