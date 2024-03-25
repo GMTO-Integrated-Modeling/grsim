@@ -39,6 +39,7 @@ gmt_dos-clients_transceiver = { version = "2.0.0", features = ["insecure"] }
 default = ["crseo", "gmt_dos-clients_crseo"]
 # Set ASM command using a modal basis
 modal_asm_cmd = []
+windloads = []
 
 [[bin]]
 name = "ngao-opm"
