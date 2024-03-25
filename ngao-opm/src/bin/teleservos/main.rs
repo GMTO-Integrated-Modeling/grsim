@@ -199,8 +199,8 @@ async fn main() -> anyhow::Result<()> {
     let null_piston = Signals::new(7, 100);
 
     // TRANSCEIVER ...
-    let server_address = env::var("SERVOS_SERVER_IP")?;
-    let client_address = env::var("SERVOS_CLIENT_IP")?;
+    let server_address = env::var("RX_SERVER_ADDRESS")?;
+    let client_address = env::var("TX_ADDRESS")?;
     let mut monitor = Monitor::new();
 
     let m2_asm_cmd =

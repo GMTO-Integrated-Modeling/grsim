@@ -29,8 +29,7 @@ use gmt_dos_clients_io::{
     },
     optics::{M2modes, SegmentWfeRms, Wavefront, WfeRms},
 };
-use gmt_dos_clients_transceiver::{Monitor, Transceiver};
-use interface::{filing::Filing, units::MuM, Data, Read, Size, Tick, Update, Write};
+use interface::{units::MuM, Data, Read, Size, Tick, Update, Write};
 use matio_rs::{MatFile, MatioError};
 use nalgebra as na;
 
@@ -120,26 +119,7 @@ async fn main() -> anyhow::Result<()> {
     let modes2actuators = ModalToZonal::new().unwrap();
 
     let metronome: Timer = Timer::new(n_step);
-
-    // TRANSCEIVER ...
     let prt = Print::default();
-
-    let server_address = env::var("SERVOS_SERVER_IP")?;
-    let client_address = env::var("SERVOS_CLIENT_IP")?;
-    let mut monitor = Monitor::new();
-
-    let m2_asm_cmd =
-        Transceiver::<M2ASMAsmCommand>::transmitter(&client_address)?.run(&mut monitor);
-
-    let rx_address = "0.0.0.0:0";
-    let m2_asm_facesheet =
-        Transceiver::<M2ASMFaceSheetFigure>::receiver(&server_address, rx_address)?
-            .run(&mut monitor);
-    let m1_rbms =
-        Transceiver::<M1RigidBodyMotions>::receiver(&server_address, rx_address)?.run(&mut monitor);
-    let m2_rbms = Transceiver::<M2ASMReferenceBodyNodes>::receiver(&server_address, rx_address)?
-        .run(&mut monitor);
-    // ... TRANSCEIVER
 
     // Simulation architecture
     actorscript! (
@@ -152,17 +132,17 @@ async fn main() -> anyhow::Result<()> {
                             -> modes2actuators
 
         // 1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
-        1: modes2actuators[M2ASMAsmCommand] -> m2_asm_cmd
+        1: modes2actuators[M2ASMAsmCommand]>>
         // 1: {gmt_servos::GmtFem}[M2ASMFaceSheetFigure] -> optical_model
-        1: m2_asm_facesheet[M2ASMFaceSheetFigure] -> optical_model
+        1: >>[M2ASMFaceSheetFigure] -> optical_model
 
         8: optical_model[WfeRms<-9>]$.. -> prt
         8: optical_model[SegmentWfeRms<-9>]$.. -> prt
 
         // 1: {gmt_servos::GmtFem}[M1RigidBodyMotions] -> optical_model
-        1: m1_rbms[M1RigidBodyMotions] -> optical_model
+        1: >>[M1RigidBodyMotions] -> optical_model
         // 1: {gmt_servos::GmtFem}[M2ASMReferenceBodyNodes] -> optical_model
-        1: m2_rbms[M2ASMReferenceBodyNodes] -> optical_model
+        1: >>[M2ASMReferenceBodyNodes] -> optical_model
     );
 
     // let metronome: Timer = Timer::new(0);
@@ -177,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
 
     let _: complot::Heatmap = ((phase.as_arc().as_slice(), (n_px, n_px)), None).into();
 
-    monitor.await?;
+    // monitor.await?;
 
     Ok(())
 }
