@@ -14,7 +14,7 @@ publish = false
 [workspace.dependencies]
 anyhow = "1.0.75"
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
-gmt_dos-actors = "10.2"
+gmt_dos-actors = "11.0.0"
 gmt_dos-clients = "4.0"
 interface = { version = "1.0", package = "gmt_dos-actors-clients_interface" }
 gmt_dos-clients_io = "4.1"
@@ -28,10 +28,3 @@ gmt-fem = "5.1.0"
 
 #[profile.release]
 #lto = "fat"
-
-[patch.crates-io]
-#gmt_dos-clients_windloads = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
-#gmt_dos-actors = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
-#gmt_dos-clients = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
-gmt_dos-actors-clients_interface = { git = 'https://github.com/rconan/dos-actors.git', branch = 'filing' }
-#gmt-fem = { git = 'https://github.com/rconan/dos-actors.git', branch = 'windloads-system' }
