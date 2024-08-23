@@ -1,0 +1,28 @@
+[package]
+name = "grsim_ltao"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+publish.workspace = true
+default-run = "ltao"
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+gmt_dos-actors.workspace = true
+gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
+interface.workspace = true
+gmt_dos-clients_io.workspace = true
+gmt_dos-clients_arrow.workspace = true
+gmt_dos-clients_crseo = { workspace = true }
+crseo.workspace = true
+gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
+skyangle = "0.2.2"
+
+[[bin]]
+name = "ltao"
+path = "src/main.rs"
