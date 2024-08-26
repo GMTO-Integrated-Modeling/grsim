@@ -22,9 +22,7 @@ gmt-fem.workspace = true
 gmt_dos-actors.workspace = true
 gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
 gmt_dos-clients_arrow.workspace = true
-gmt_dos-clients_crseo = { workspace = true, features = [
-    "faer",
-], optional = true }
+gmt_dos-clients_crseo = { workspace = true, optional = true }
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
 gmt_dos-clients_servos = "2.0.0"

@@ -22,6 +22,8 @@ gmt_dos-clients_crseo = { workspace = true }
 crseo.workspace = true
 gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
 skyangle = "0.2.2"
+complot = "0.3.4"
+serde-pickle = "1.1.1"
 
 [[bin]]
 name = "ltao"

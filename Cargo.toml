@@ -1,5 +1,5 @@
 [workspace]
-members = ["open-loop", "ngao", "ngao-opm"]
+members = ["open-loop", "ngao", "ngao-opm", "ltao"]
 resolver = "2"
 
 [workspace.package]
@@ -23,8 +23,16 @@ gmt_dos-clients_crseo = "4.3"
 gmt_dos-clients_scope = { version = "3.0", features = ["server"] }
 gmt_dos-clients_scope-client = "0.2.1"
 gmt_dos-clients_windloads = "2.0.3"
-crseo = "0.9"
+crseo = "1.0"
 gmt-fem = "5.1.0"
 
 #[profile.release]
 #lto = "fat"
+
+[patch.crates-io]
+gmt_dos-actors = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/actors" }
+gmt_dos-actors-clients_interface = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/interface" }
+gmt_dos-clients = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/core" }
+gmt_dos-clients_crseo = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/crseo" }
+gmt_dos-clients_io = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/io" }
+crseo = { path = "/home/ubuntu/data/home/ubuntu/projects/crseo" }

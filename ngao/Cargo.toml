@@ -18,7 +18,7 @@ gmt_dos-clients = { workspace = true, features = ["nalgebra"] }
 interface.workspace = true
 gmt_dos-clients_io.workspace = true
 gmt_dos-clients_arrow.workspace = true
-gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
+gmt_dos-clients_crseo = { workspace = true }
 crseo.workspace = true
 gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
 nanorand = "0.7.0"
