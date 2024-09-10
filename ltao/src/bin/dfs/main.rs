@@ -14,18 +14,28 @@ use gmt_dos_clients_io::{
     },
 };
 use interface::{Tick, Update, UID};
+use skyangle::Conversion;
 
 const DFS_CAMERA_EXPOSURE: usize = 1;
 const DFS_FFT_EXPOSURE: usize = 1;
 
 type DFS = DispersedFringeSensor<DFS_CAMERA_EXPOSURE, DFS_FFT_EXPOSURE>;
 type DFS11 = DispersedFringeSensor<1, 1>;
+type DFSP11 = DispersedFringeSensorProcessing<1, 1>;
+
+/*
+on-axis:  #    0: [[-1012, +2094, -3171, +4130, -5288, +6327]]
+8' off-axis:  #    0: [[-1004, +2047, -3183, +4160, -5269, +6254]]
+*/
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let src_builder = Source::builder().band("J");
+    let src_builder = Source::builder()
+        .band("J")
+        .size(3)
+        .on_ring(8f32.from_arcmin());
 
-    let mut calib_m1_tz = <DispersedFringeSensorProcessing<1, 1> as Calibrate<GmtM1>>::calibrate(
+    let mut calib_m1_tz = <DFSP11 as Calibrate<GmtM1>>::calibrate(
         OpticalModel::<DFS>::builder()
             .source(src_builder.clone())
             .sensor(DFS::builder().nyquist_factor(3.)),
