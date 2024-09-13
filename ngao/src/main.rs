@@ -1,9 +1,8 @@
 use std::{env, fs::File, path::Path, sync::Arc};
 
 use crseo::{
-    atmosphere,
-    wavefrontsensor::{LensletArray, Pyramid},
-    Atmosphere, Builder, FromBuilder, Gmt, WavefrontSensorBuilder,
+    atmosphere, imaging::LensletArray, wavefrontsensor::Pyramid, Atmosphere, Builder, FromBuilder,
+    Gmt, WavefrontSensorBuilder,
 };
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{
@@ -12,8 +11,8 @@ use gmt_dos_clients::{
     Average, Gain, Integrator, Offset, Signal, Signals, Timer,
 };
 use gmt_dos_clients_crseo::{
-    Calibration, DetectorFrame, GuideStar, OpticalModel, Processor, PyramidCalibrator,
-    PyramidMeasurements, ResidualM2modes, WavefrontSensor, WavefrontStats,
+    ngao::{Calibration, DetectorFrame, GuideStar, ResidualM2modes, WavefrontSensor},
+    OpticalModel, Processor, PyramidCalibrator, PyramidMeasurements, WavefrontStats,
 };
 use gmt_dos_clients_io::optics::{
     M2modes, SegmentD7Piston, SegmentPiston, SegmentWfeRms, Wavefront, WfeRms,
@@ -150,7 +149,7 @@ async fn main() -> anyhow::Result<()> {
     let segment_piston_int_scope = Scope::<NM<SegmentPistonInt>>::builder(&mut monitor)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
-    let n = optical_model.src.borrow().pupil_sampling();
+    let n = optical_model.src.pupil_sampling();
     let pupil_scope = Shot::<Wavefront>::builder(&mut monitor, [n; 2])
         .sampling_frequency(sampling_frequency as f64 / 50f64)
         .build()?;
