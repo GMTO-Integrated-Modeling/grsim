@@ -1,4 +1,4 @@
-use gmt_dos_clients_crseo::Reconstructor;
+use gmt_dos_clients_crseo::calibration::Reconstructor;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut calib_m2_modes_onaxis: Reconstructor = serde_pickle::from_reader(

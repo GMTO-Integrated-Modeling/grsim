@@ -9,8 +9,9 @@ use crseo::{
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signal, Signals, Timer};
 use gmt_dos_clients_crseo::{
-    Calibrate, CalibrationMode, Centroids, NoSensor, OpticalModel, Reconstructor, WaveSensor,
-    WaveSensorBuilder,
+    calibration::{Calibrate, CalibrationMode,Reconstructor},
+    sensors::{NoSensor, WaveSensor, WaveSensorBuilder},
+    OpticalModel,Centroids
 };
 use gmt_dos_clients_io::{
     gmt_m1::{segment::RBM, M1RigidBodyMotions},
@@ -147,7 +148,7 @@ async fn main() -> anyhow::Result<()> {
                 " #{}: {:+.3?} {:+.3?}",
                 i + 1,
                 data.iter()
-                    .map(|x| x / 1f64.from_arcsec())
+                    .map(|x| x.to_arcsec())
                     .collect::<Vec<_>>(),
                 rxy
             )

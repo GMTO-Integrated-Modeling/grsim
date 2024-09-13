@@ -2,7 +2,7 @@ use std::path::Path;
 
 use gmt_dos_actors::{actorscript, system::Sys};
 use gmt_dos_clients::{Average, Timer};
-use gmt_dos_clients_crseo::{NoSensor, OpticalModel};
+use gmt_dos_clients_crseo::{sensors::NoSensor, OpticalModel};
 use gmt_dos_clients_io::{
     cfd_wind_loads::{CFDM1WindLoads, CFDM2WindLoads, CFDMountWindLoads},
     gmt_m1::M1RigidBodyMotions,

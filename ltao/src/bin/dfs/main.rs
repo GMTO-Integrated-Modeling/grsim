@@ -5,7 +5,8 @@ use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Sampler, Signal, Signals, Timer};
 use gmt_dos_clients_arrow::Arrow;
 use gmt_dos_clients_crseo::{
-    Calibrate, CalibrationMode, DispersedFringeSensor, DispersedFringeSensorProcessing,
+    calibration::{Calibrate, CalibrationMode},
+    sensors::{DispersedFringeSensor, DispersedFringeSensorProcessing},
     OpticalModel,
 };
 use gmt_dos_clients_io::{
@@ -98,17 +99,17 @@ async fn main() -> anyhow::Result<()> {
 
         actorscript!(
             1: m1_rbm[M1RigidBodyMotions] -> om
-            1000: om[DfsFftFrame<Dev>] -> dfs_processor[Intercepts]
+            1000: om[DfsFftFrame<Dev>]! -> dfs_processor[Intercepts]
                     -> calib_m1_tz[SegmentPiston] -> to_nm[SegmentPiston] -> print
         );
     }
 
-    // let timer: Timer = Timer::new(1000);
-    // actorscript!(
-    //     #[model(name = dfs_frames)]
-    //     1: timer[Tick] -> om
-    //     100: om[DfsFftFrame<Host>]$
-    // );
+    /*     let timer: Timer = Timer::new(1000);
+    actorscript!(
+        #[model(name = dfs_frames)]
+        1: timer[Tick] -> om
+        100: om[DfsFftFrame<Host>]!$
+    ); */
 
     /*     // println!("DFS CAMERA FRAME");
     let mut log = logging_10.lock().await;

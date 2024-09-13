@@ -3,7 +3,9 @@ use crseo::{
     FromBuilder, Gmt, Source,
 };
 use gmt_dos_clients_crseo::{
-    Calibrate, CalibrationMode, NoSensor, OpticalModel, WaveSensor, WaveSensorBuilder,
+    calibration::{Calibrate, CalibrationMode},
+    sensors::{NoSensor, WaveSensor, WaveSensorBuilder},
+    OpticalModel,
 };
 use skyangle::Conversion;
 
