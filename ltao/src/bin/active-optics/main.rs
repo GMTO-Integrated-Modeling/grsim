@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::{fs::File, path::Path};
 
 use complot::{Config, Heatmap};
 use crseo::{
@@ -9,9 +9,9 @@ use crseo::{
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signal, Signals, Timer};
 use gmt_dos_clients_crseo::{
-    calibration::{Calibrate, CalibrationMode,Reconstructor},
-    sensors::{NoSensor, WaveSensor, WaveSensorBuilder},
-    OpticalModel,Centroids
+    calibration::{Calibrate, CalibrationMode, Reconstructor},
+    sensors::{Camera, CameraBuilder, NoSensor, WaveSensor, WaveSensorBuilder},
+    Centroids, DeviceInitialize, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::{segment::RBM, M1RigidBodyMotions},
@@ -35,28 +35,37 @@ pub enum OffAxisWavefront {}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    std::env::set_var(
+        "DATA_REPO",
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("bin")
+            .join("active-optics"),
+    );
+
     // Wavefront sensor (Shack-Hartmann)
-    let imgr_builder: ImagingBuilder = Imaging::builder()
+    let imgr_builder: CameraBuilder = Camera::builder()
         .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(16))
         .lenslet_flux(0.75);
     // Centroiding data processor
     let mut centroids = Centroids::try_from(&imgr_builder)?;
 
     // On-axis optical model
-    let om_builder = OpticalModel::<Imaging>::builder()
+    let om_builder = OpticalModel::<Camera>::builder()
         .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
         .sensor(imgr_builder);
 
     // Calibration of M2 Karhunen-Loeve modes
     let mut calib_m2_modes = <Centroids as Calibrate<GmtM2>>::calibrate(
-        om_builder.clone(),
+        om_builder.clone().into(),
         CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
     )?;
     calib_m2_modes.pseudoinverse();
     println!("{calib_m2_modes}");
 
     let mut om = om_builder.build()?;
-    centroids.setup(&mut om);
+    // centroids.setup(&mut om);
+    om.initialize(&mut centroids);
     dbg!(centroids.n_valid_lenslets());
 
     // M1 Rx & Ry commands
@@ -147,9 +156,7 @@ async fn main() -> anyhow::Result<()> {
             println!(
                 " #{}: {:+.3?} {:+.3?}",
                 i + 1,
-                data.iter()
-                    .map(|x| x.to_arcsec())
-                    .collect::<Vec<_>>(),
+                data.iter().map(|x| x.to_arcsec()).collect::<Vec<_>>(),
                 rxy
             )
         });
