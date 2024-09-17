@@ -19,16 +19,17 @@ use gmt_dos_clients_crseo::{
 };
 use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
-    optics::{Dev, Frame, SegmentWfeRms, SensorData, Wavefront, WfeRms},
+    optics::{Dev, Frame, Host, SegmentWfeRms, SensorData, Wavefront, WfeRms},
 };
 use interface::{Tick, UID};
 use skyangle::Conversion;
 
-const N_STEP: usize = 50;
+const N_STEP: usize = 10;
 const M2_N_MODE: usize = 200;
 const OIWFS: usize = 1;
 
 type LtwsCentroid = Centroids<ZeroMean>;
+const LTWS_1ST_MODE: usize = 2;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -64,8 +65,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut calib_oiwfs_tt = <Centroids as Calibrate<GmtM2>>::calibrate(
         &((&oiwfs_tt_om_builder).into()),
-        CalibrationMode::modes(M2_N_MODE, 1e-7)
-            .start_from(2)
+        CalibrationMode::modes(M2_N_MODE, 1e-8) // .start_from(2)
             .ends_at(3),
     )?;
     calib_oiwfs_tt.pseudoinverse();
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut calib_m2_modes = <LtwsCentroid as Calibrate<GmtM2>>::calibrate(
         &((&ltws_om_builder).into()),
-        CalibrationMode::modes(M2_N_MODE, 1e-7).start_from(4),
+        CalibrationMode::modes(M2_N_MODE, 1e-7).start_from(LTWS_1ST_MODE),
     )?;
     calib_m2_modes.pseudoinverse();
     println!("{calib_m2_modes}");
@@ -106,7 +106,6 @@ async fn main() -> anyhow::Result<()> {
     // ... LTWS
 
     let integrator = Integrator::new(M2_N_MODE * 7).gain(0.5);
-    // let oiwfs_integrator = Integrator::new(M2_N_MODE * 7).gain(0.5);
     let adder = Operator::new("+");
 
     let timer: Timer = Timer::new(N_STEP);
@@ -116,23 +115,24 @@ async fn main() -> anyhow::Result<()> {
         #[labels(ltws_om="LTWS",
             integrator="Integrator",
             oiwfs_tt_om="OIWFS",
-            print="WFE RMS")]
+            calib_m2_modes = "M2 segment modes [2,200]\nreconstructor",
+            calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            adder="Add",print="WFE RMS")]
         1: timer[Tick]
         -> ltws_om[Frame<Dev>]!
-            -> ltws_centroids[SensorData]
+            -> ltws_centroids[LtwsData]
                 -> calib_m2_modes[Left<LtwsResidualAsmCmd>]${M2_N_MODE*7}
-                    -> adder
-        1: oiwfs_tt_om[Frame<Dev>]
-            -> oiwfs_centroids[SensorData]
-                -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]${M2_N_MODE*7}
                     -> adder[M2ASMAsmCommand]${M2_N_MODE*7}
-        -> integrator[M2ASMAsmCommand]! -> ltws_om[WfeRms<-9>] -> print
-        1: integrator[M2ASMAsmCommand]! -> oiwfs_tt_om[WfeRms<-9>] -> print
+                    -> integrator[M2ASMAsmCommand] -> ltws_om[WfeRms<-9>] -> print
+        1: timer[Tick]
+        -> oiwfs_tt_om[Frame<Dev>]!
+            -> oiwfs_centroids[OiwfsData]${2}
+                -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]${M2_N_MODE*7}
+                    -> adder
+        1: oiwfs_tt_om[Frame<Host>]${256*256}
+        1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om[WfeRms<-9>] -> print
         1: ltws_om[SegmentWfeRms<-9>] -> print
         1: ltws_om[Wavefront]${481*481}
-
-
-
     );
 
     println!("{}", logging_1.lock().await);
@@ -141,7 +141,13 @@ async fn main() -> anyhow::Result<()> {
 }
 
 #[derive(UID)]
+pub enum LtwsData {}
+
+#[derive(UID)]
 pub enum LtwsResidualAsmCmd {}
 
 #[derive(UID)]
 pub enum OiwfsResidualAsmCmd {}
+
+#[derive(UID)]
+pub enum OiwfsData {}
