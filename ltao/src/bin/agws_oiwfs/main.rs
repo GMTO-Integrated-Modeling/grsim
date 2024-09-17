@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     let ltws = Camera::builder()
         .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(8))
         .lenslet_flux(0.75);
-    let mut ltws_centroids = Centroids::try_from(&ltws)?;
+    let mut ltws_centroids: Centroids = Centroids::try_from(&ltws)?;
 
     let mut ltws_om_builder = OpticalModel::<Camera<OIWFS>>::builder()
         .sampling_frequency(sampling_frequency)
