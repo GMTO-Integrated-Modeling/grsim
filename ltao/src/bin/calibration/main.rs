@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
         // On-axis calibration of M2 RBM
         println!("On-axis calibration of M2 RBM");
         let mut rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
-            OpticalModel::<WaveSensor>::builder()
+            &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
                 .sensor(WaveSensorBuilder(OpticalModel::<NoSensor>::builder())),
             CalibrationMode::modes(M2_N_MODE, 1e-6),
@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
         // Off-axis calibration of M2 modes
         println!("Off-axis calibration of M2 modes");
         let mut rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
-            OpticalModel::<WaveSensor>::builder()
+            &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
                 .source(srcs.clone())
                 .sensor(WaveSensorBuilder(
@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
     let calib_m1_rbm_onaxis = {
         println!("On-axis calibration of M1 RBM");
         let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
-            OpticalModel::<WaveSensor>::builder()
+            &OpticalModel::<WaveSensor>::builder()
                 .sensor(WaveSensorBuilder(OpticalModel::<NoSensor>::builder())),
             CalibrationMode::RBM([
                 None,                     // Tx
@@ -73,7 +73,7 @@ fn main() -> anyhow::Result<()> {
     let calib_m1_rbm_offaxis = {
         println!("Off-axis calibration of M1 RBM");
         let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
-            OpticalModel::<WaveSensor>::builder()
+            &pOpticalModel::<WaveSensor>::builder()
                 .source(srcs.clone())
                 .sensor(WaveSensorBuilder(
                     OpticalModel::<NoSensor>::builder().source(srcs),

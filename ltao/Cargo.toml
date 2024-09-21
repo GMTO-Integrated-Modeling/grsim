@@ -26,6 +26,7 @@ complot = "0.3.4"
 serde-pickle = "1.1.1"
 gmt_dos-clients_servos = "2.1.0"
 gmt_dos-clients_windloads.workspace = true
+faer = "0.19.3"
 
 [[bin]]
 name = "ltao"

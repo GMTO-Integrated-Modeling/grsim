@@ -24,7 +24,7 @@ const DFS_FFT_EXPOSURE: usize = 1000;
 
 type DFS = DispersedFringeSensor<DFS_CAMERA_EXPOSURE, DFS_FFT_EXPOSURE>;
 type DFS11 = DispersedFringeSensor<1, 1>;
-type DFSP11 = DispersedFringeSensorProcessing<1, 1>;
+type DFSP11 = DispersedFringeSensorProcessing;
 
 /*
 on-axis:  #    0: [[-1012, +2094, -3171, +4130, -5288, +6327]]
@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         serde_pickle::from_reader(&file, Default::default()).unwrap()
     } else {
         let mut calib_m1_tz = <DFSP11 as Calibrate<GmtM1>>::calibrate(
-            OpticalModel::<DFS11>::builder()
+            &OpticalModel::<DFS11>::builder()
                 .source(src_builder.clone())
                 .sensor(DFS11::builder().nyquist_factor(3.)),
             CalibrationMode::RBM([None, None, Some(1e-6), None, None, None]),
@@ -67,7 +67,11 @@ async fn main() -> anyhow::Result<()> {
         .sampling_frequency(sampling_frequency)
         .source(src_builder.clone())
         .atmosphere(atm_builder)
-        .sensor(DFS::builder().nyquist_factor(3.));
+        .sensor(
+            DFS::builder()
+                .source(src_builder.clone())
+                .nyquist_factor(3.),
+        );
     let mut om = om_builder.clone().build()?;
     let n = om.sensor().as_ref().unwrap().frame_size();
     let n_fft = om.sensor().as_ref().unwrap().fft_size();
