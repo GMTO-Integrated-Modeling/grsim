@@ -165,12 +165,13 @@ async fn main() -> anyhow::Result<()> {
     let print = Print::default();
     actorscript!(
         #[model(name=agws_oiwfs)]
-        #[labels(ltws_om="⤳ 🌫 ⤳\n⤳ GMT ⤳\n⤳ LTWS",
+        #[labels(ltws_om="⤳ GMT ⤳\n⤳ LTWS",//"⤳ 🌫 ⤳\n⤳ GMT ⤳\n⤳ LTWS"
             integrator="Integrator",
-            oiwfs_tt_om="⤳ 🌫 ⤳\n⤳ GMT ⤳\n⤳ OIWFS",
+            oiwfs_tt_om="⤳ GMT ⤳\n⤳ OIWFS",
             calib_m2_modes = "M2 segment modes [2,200]\nreconstructor",
-            calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            // calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
             // adder="Add",
+            offaxis_om = "⤳ GMT ⤳\n⤳ DFS GSs",
             fun = "∛",
             print="WFE RMS",
             m1_rbm="M1 RBM")]
@@ -189,11 +190,11 @@ async fn main() -> anyhow::Result<()> {
         1: m1_rbm[M1RigidBodyMotions]
         // OIWFS
         -> oiwfs_tt_om[Frame<Dev>]!
-            -> oiwfs_centroids[OiwfsData]
-                -> calib_oiwfs_tt//[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
+           // -> oiwfs_centroids//[OiwfsData]
+                //-> calib_oiwfs_tt//[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
                     // -> adder
         1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om[Frame<Host>]$.. -> fun[Frame<Host>].. -> oiwfs_gif
-        1: oiwfs_tt_om[OiwfsWavefront]$
+        // 1: oiwfs_tt_om[OiwfsWavefront]$
         // DFS
         1: m1_rbm[M1RigidBodyMotions] -> offaxis_om
         1: integrator[M2ASMAsmCommand] -> offaxis_om[DfsWavefront]$
@@ -212,14 +213,15 @@ async fn main() -> anyhow::Result<()> {
     let print_dfs = Print::default().tag("DFS");
     actorscript!(
         #[model(name=agws_oiwfs_dfs)]
-        #[labels(ltws_om="⤳ 🌫 ⤳ GMT ⤳ LTWS",
+        #[labels(ltws_om="⤳ GMT ⤳\n⤳ LTWS",
             integrator="Integrator",
-            oiwfs_tt_om="⤳ 🌫 ⤳ GMT ⤳ OIWFS",
+            oiwfs_tt_om="⤳ GMT ⤳\n⤳ OIWFS",
             calib_m2_modes = "M2 segment modes [2,200]\nreconstructor",
-            calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            // calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            offaxis_om = "⤳ GMT ⤳\n⤳ DFS GSs",
             // adder="Add",
             print="WFE RMS",m1_rbm="M1 RBM",
-            dfs_om="⤳ 🌫 ⤳ GMT ⤳ DFS",
+            dfs_om="⤳ GMT ⤳\n⤳ DFS",
             add_m1_rbm="Add")]
         // LTWFS
         1: timer[Tick] -> ltws_om
