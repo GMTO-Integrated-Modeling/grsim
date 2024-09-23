@@ -37,7 +37,7 @@ const N_STEP: usize = 40;
 const M2_N_MODE: usize = 66;
 const OIWFS: usize = 1;
 
-type LtwsCentroid = Centroids<Full>;
+type LtwsCentroid = Centroids<ZeroMean>;
 const LTWS_1ST_MODE: usize = 2;
 
 const DFS_CAMERA_EXPOSURE: usize = 1;
@@ -151,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
     // ... LTWS
 
     let integrator = Integrator::new(M2_N_MODE * 7).gain(0.5);
-    // let adder = Operator::new("+");
+    let adder = Operator::new("+");
 
     let m1_rbm = Signals::new(42, 1000).channel(4 + 6, 1000f64.from_mas());
 
@@ -169,8 +169,8 @@ async fn main() -> anyhow::Result<()> {
             integrator="Integrator",
             oiwfs_tt_om="⤳ GMT ⤳\n⤳ OIWFS",
             calib_m2_modes = "M2 segment modes [2,200]\nreconstructor",
-            // calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
-            // adder="Add",
+            calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            adder="Add",
             offaxis_om = "⤳ GMT ⤳\n⤳ DFS GSs",
             fun = "∛",
             print="WFE RMS",
@@ -181,19 +181,19 @@ async fn main() -> anyhow::Result<()> {
         -> ltws_om[Frame<Dev>]!
             -> ltws_centroids[LtwsData]
                 -> calib_m2_modes[Left<LtwsResidualAsmCmd>]//${M2_N_MODE*7}
-                    // -> adder[M2ASMAsmCommand]//${M2_N_MODE*7}
+                    -> adder[M2ASMAsmCommand]//${M2_N_MODE*7}
                         -> integrator[M2ASMAsmCommand]
                             -> ltws_om//[Frame<Host>].. -> ltws_gif
         1: ltws_om[WfeRms<-9>] -> print
         1: ltws_om[SegmentWfeRms<-9>] -> print
         1: ltws_om[Wavefront]$
-        1: m1_rbm[M1RigidBodyMotions]
         // OIWFS
+        1: m1_rbm[M1RigidBodyMotions]
         -> oiwfs_tt_om[Frame<Dev>]!
-           // -> oiwfs_centroids//[OiwfsData]
-                //-> calib_oiwfs_tt//[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
-                    // -> adder
-        1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om[Frame<Host>]$.. -> fun[Frame<Host>].. -> oiwfs_gif
+           -> oiwfs_centroids[OiwfsData]
+                -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
+                    -> adder
+        1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om[Frame<Host>].. -> fun[Frame<Host>].. -> oiwfs_gif
         // 1: oiwfs_tt_om[OiwfsWavefront]$
         // DFS
         1: m1_rbm[M1RigidBodyMotions] -> offaxis_om
@@ -217,9 +217,9 @@ async fn main() -> anyhow::Result<()> {
             integrator="Integrator",
             oiwfs_tt_om="⤳ GMT ⤳\n⤳ OIWFS",
             calib_m2_modes = "M2 segment modes [2,200]\nreconstructor",
-            // calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
+            calib_oiwfs_tt = "M2 segment modes [1,3]\nreconstructor",
             offaxis_om = "⤳ GMT ⤳\n⤳ DFS GSs",
-            // adder="Add",
+            adder="Add",
             print="WFE RMS",m1_rbm="M1 RBM",
             dfs_om="⤳ GMT ⤳\n⤳ DFS",
             add_m1_rbm="Add")]
@@ -229,7 +229,7 @@ async fn main() -> anyhow::Result<()> {
         -> ltws_om[Frame<Dev>]!
             -> ltws_centroids[LtwsData]
                 -> calib_m2_modes[Left<LtwsResidualAsmCmd>]//${M2_N_MODE*7}
-                    // -> adder[M2ASMAsmCommand]//${M2_N_MODE*7}
+                    -> adder[M2ASMAsmCommand]//${M2_N_MODE*7}
                         -> integrator[M2ASMAsmCommand]
                             -> ltws_om
         1: ltws_om[WfeRms<-9>] -> print
@@ -237,11 +237,11 @@ async fn main() -> anyhow::Result<()> {
         1: ltws_om[Wavefront]$
         // OIWFS
         1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om
-        1: add_m1_rbm[M1RigidBodyMotions] -> oiwfs_tt_om
-        // -> oiwfs_tt_om[Frame<Dev>]!
-        //     -> oiwfs_centroids[OiwfsData]
-        //         -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
-        //             -> adder
+        1: add_m1_rbm[M1RigidBodyMotions]
+        -> oiwfs_tt_om[Frame<Dev>]!
+            -> oiwfs_centroids[OiwfsData]
+                -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
+                    -> adder
         2: oiwfs_tt_om[Frame<Host>].. -> fun[Frame<Host>].. -> oiwfs_gif
         // DFS
         1: integrator[M2ASMAsmCommand] -> dfs_om
