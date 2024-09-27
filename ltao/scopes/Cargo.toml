@@ -1,0 +1,15 @@
+[package]
+name = "scopes"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow = "1.0.79"
+gmt_dos-clients_io = "4.1.0"
+gmt_dos-clients_scope-client = { version = "0.2.2", features = ["compress"] }
+interface = "0.0.1"
+tokio = "1.36.0"
+
+
+[workspace]
