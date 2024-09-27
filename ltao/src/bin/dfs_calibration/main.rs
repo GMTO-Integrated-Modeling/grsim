@@ -179,6 +179,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    let mut om = OpticalModel::<NoSensor>::builder()
+        .gmt(gmt_builder.clone())
+        .build()?;
+    // dbg!(&cmd[..10]);
+    <OpticalModel<NoSensor> as Read<M1RigidBodyMotions>>::read(&mut om, m1_rbm.clone().into());
+    <OpticalModel<NoSensor> as Read<M2ASMAsmCommand>>::read(&mut om, cmd.clone().into());
+    om.update();
+    dbg!(<OpticalModel as Write<WfeRms<-9>>>::write(&mut om));
+
     <OpticalModel<DFS> as Read<M1RigidBodyMotions>>::read(&mut dfs_om, m1_rbm.into());
     // dbg!(&cmd[..10]);
     // dbg!(&cmd[66..76]);

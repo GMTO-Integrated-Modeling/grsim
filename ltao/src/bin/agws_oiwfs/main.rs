@@ -17,8 +17,8 @@ use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode, Reconstructor},
     centroiding::{Full, ZeroMean},
     sensors::{
-        Camera, DispersedFringeSensor, DispersedFringeSensorProcessing, NoSensor, WaveSensor,
-        WaveSensorBuilder,
+        builders::WaveSensorBuilder, Camera, DispersedFringeSensor,
+        DispersedFringeSensorProcessing, NoSensor, WaveSensor,
     },
     Centroids, DeviceInitialize, OpticalModel, OpticalModelBuilder,
 };
@@ -143,6 +143,7 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     ltws_om_builder.initialize(&mut ltws_centroids);
+    dbg!(ltws_centroids.n_valid_lenslets());
 
     let ltws_om = ltws_om_builder
         //.atmosphere(atm_builder.clone())
@@ -254,7 +255,7 @@ async fn main() -> anyhow::Result<()> {
         1: add_m1_rbm[M1RigidBodyMotions] -> offaxis_om
     );
 
-    let mut logs = agws_oiwfs_dfs__logging_1.lock().await;
+    let mut logs = agws_oiwfs_dfs_logging_1.lock().await;
     println!("{}", logs);
 
     // logs.iter("M1RigidBodyMotions")?
@@ -302,7 +303,7 @@ pub struct DfsReconstructor {
 impl DfsReconstructor {
     pub fn new() -> Self {
         let recon: Reconstructor = serde_pickle::from_reader(
-            File::open("src/bin/calibration/calib_dfs_closed-loop_m1-rxy.pkl").unwrap(),
+            File::open("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl").unwrap(),
             Default::default(),
         )
         .unwrap();
