@@ -15,7 +15,7 @@ use gmt_dos_clients::{
 };
 use gmt_dos_clients_crseo::{
     calibration::{
-        Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate, Reconstructor,
+        Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate, Collapse, Reconstructor,
     },
     centroiding::ZeroMean,
     sensors::{
@@ -29,11 +29,13 @@ use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{
         dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
-        Dev, Frame, Host, SegmentWfeRms, Wavefront, WfeRms,
+        Dev, Frame, Host, SegmentWfeRms, SensorData, Wavefront, WfeRms,
     },
 };
 use gmt_dos_clients_scope::server::{Monitor, Scope};
+use grsim_ltao::{MergedReconstructor, MergedReconstructorSh48};
 use interface::{units::Mas, Data, Read, Tick, Units, Update, Write, UID};
+use nanorand::{Rng, WyRand};
 use skyangle::Conversion;
 
 const N_STEP: usize = 40;
@@ -221,8 +223,28 @@ async fn main() -> anyhow::Result<()> {
     let integrator = Integrator::new(M2_N_MODE * 7).gain(0.5);
     let adder = Operator::new("+");
 
-    let m1_rbm = Signals::new(42, 1000).channel(4 + 6, 100f64.from_mas());
-    let m1_bm = Signals::new(M1_N_MODE * 7, 1000).channel(0, 1e-4);
+    let mut rng = WyRand::new();
+
+    let m1_rbm = (0..7).fold(Signals::new(42, 1000), |s, i| {
+        s.channel(
+            3 + 6 * i,
+            (2. * rng.generate::<f64>() - 1.) * 250f64.from_mas(),
+        )
+        .channel(
+            4 + 6 * 1,
+            (2. * rng.generate::<f64>() - 1.) * 2520f64.from_mas(),
+        )
+    });
+    let m1_bm = (0..7).fold(Signals::new(M1_N_MODE * 7, 1000), |s, i| {
+        (0..11).fold(s, |s, j| {
+            s.channel(
+                M1_N_MODE * i + j,
+                (2. * rng.generate::<f64>() - 1.) * 1e-4 / ((j + 1) as f64),
+            )
+        })
+    });
+
+    // Signals::new(M1_N_MODE * 7, 1000).channel(0, 1e-4);
 
     // let to_nm = Gain::new(vec![1e9; 6]);
 
@@ -265,7 +287,7 @@ async fn main() -> anyhow::Result<()> {
                             -> ltws_om//[Frame<Host>].. -> ltws_gif
         1: ltws_om[WfeRms<-9>].. -> wfe_rms_scope
         1: ltws_om[SegmentWfeRms<-9>].. -> segment_wfe_rms_scope
-        1: ltws_om[Wavefront]$
+        10: ltws_om[Wavefront]${1921*1921}
         // OIWFS
         1: m1_bm[M1ModeShapes] -> oiwfs_tt_om
         1: m1_rbm[M1RigidBodyMotions]
@@ -278,7 +300,8 @@ async fn main() -> anyhow::Result<()> {
         // DFS
         1: m1_bm[M1ModeShapes] -> offaxis_om
         1: m1_rbm[M1RigidBodyMotions] -> offaxis_om
-        1: integrator[M2ASMAsmCommand] -> offaxis_om[DfsWavefront]$
+        1: integrator[M2ASMAsmCommand] -> offaxis_om
+        10: offaxis_om[DfsWavefront]$
     );
 
     let mut dfs_processor = DispersedFringeSensorProcessing::new();
@@ -301,10 +324,12 @@ async fn main() -> anyhow::Result<()> {
     // recon.pseudoinverse();
     // println!("{recon}");
 
-    let dfs_recon =
-        DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl");
+    // let dfs_recon =
+    //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl");
     // let dfs_recon =
     //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-21bm.pkl");
+    let mut merged_recon = MergedReconstructor::new();
+
     let dfs_integrator = Integrator::new(42).gain(0.5);
     let sh48_integrator = Integrator::new(M1_N_MODE * 7).gain(0.5);
     let add_m1_rbm = Operator::new("+");
@@ -313,7 +338,7 @@ async fn main() -> anyhow::Result<()> {
     let oiwfs_gif = Gif::new("oiwfs_dfs.gif", 512, 512)?;
 
     let timer: Timer = Timer::new(120);
-    let print_dfs = Print::default().tag("DFS");
+    // let print_dfs = Print::default().tag("DFS");
     actorscript!(
         #[model(name=agws_oiwfs_dfs)]
         #[labels(ltws_om="⤳ GMT ⤳\n⤳ LTWS",
@@ -327,15 +352,16 @@ async fn main() -> anyhow::Result<()> {
             adder="Add",
             // print="WFE RMS",m1_rbm="M1 RBM",
             sh48_om="⤳ GMT ⤳\n⤳ SH48",
-            calib_sh48_bm="SH48\n -> M1 bending modes",
+            // calib_sh48_bm="SH48\n -> M1 bending modes",
             dfs_om="⤳ GMT ⤳\n⤳ DFS",
             add_m1_rbm="Add M1 RBMs",
             add_m1_bm="Add M1 BMs",
             m1_bm="M1 BM",
-            dfs_recon="DFS\n -> M1 RBM",
-            dfs_processor="DFS fftlets\nprocessing")]
+            merged_recon="SH48 + DFS\n -> M1 RBM\n -> M1 BM",
+            dfs_processor="DFS fftlets\nprocessing",
+            wfe_rms_scope="\u{1F4DF}",segment_wfe_rms_scope="\u{1F4DF}")]
         // LTWFS
-        1: timer[Tick] -> ltws_om
+        // 1: timer[Tick] -> ltws_om
         1: m1_bm[Left<M1ModeShapes>] -> add_m1_bm[M1ModeShapes] -> ltws_om
         1: m1_rbm[Left<M1RigidBodyMotions>] -> add_m1_rbm[M1RigidBodyMotions]
         -> ltws_om[Frame<Dev>]!
@@ -346,7 +372,7 @@ async fn main() -> anyhow::Result<()> {
                             -> ltws_om
         1: ltws_om[WfeRms<-9>].. -> wfe_rms_scope
         1: ltws_om[SegmentWfeRms<-9>].. -> segment_wfe_rms_scope
-        1: ltws_om[Wavefront]$
+        10: ltws_om[Wavefront]${1921*1921}
         // OIWFS
         1: integrator[M2ASMAsmCommand] -> oiwfs_tt_om
         1: add_m1_bm[M1ModeShapes] -> oiwfs_tt_om
@@ -355,32 +381,37 @@ async fn main() -> anyhow::Result<()> {
             -> oiwfs_centroids[OiwfsData]
                 -> calib_oiwfs_tt[Right<OiwfsResidualAsmCmd>]//${M2_N_MODE*7}
                     -> adder
-        2: oiwfs_tt_om[Frame<Host>].. -> fun[Frame<Host>].. -> oiwfs_gif
+        1: oiwfs_tt_om[Frame<Host>].. -> fun[Frame<Host>].. -> oiwfs_gif
         // DFS
         1: integrator[M2ASMAsmCommand] -> dfs_om
         1: add_m1_bm[M1ModeShapes] -> dfs_om
         1: add_m1_rbm[M1RigidBodyMotions] -> dfs_om
-        10: dfs_om[DfsFftFrame<Dev>]! -> dfs_processor[Intercepts]
-            -> dfs_recon[Mas<M1Rxy>] -> print_dfs
-        10: dfs_recon[M1RigidBodyMotions] -> dfs_integrator[Right<M1RigidBodyMotions>] -> add_m1_rbm
+        10: dfs_om[DfsFftFrame<Dev>]! -> dfs_processor[Intercepts] -> merged_recon
+            //  -> dfs_recon[Mas<M1Rxy>] -> print_dfs
+        10: merged_recon[M1RigidBodyMotions] -> dfs_integrator[Right<M1RigidBodyMotions>] -> add_m1_rbm
         // SH48
         1: integrator[M2ASMAsmCommand] -> sh48_om
         1: add_m1_rbm[M1RigidBodyMotions] -> sh48_om
         1: add_m1_bm[M1ModeShapes] -> sh48_om
         10: sh48_om[Frame<Dev>]!
             -> sh48_centroids[Sh48Data]
-                -> calib_sh48_bm[M1ModeShapes]
+                -> merged_recon[M1ModeShapes]
                     -> sh48_integrator[Right<M1ModeShapes>]
                         -> add_m1_bm
 
-        1: integrator[M2ASMAsmCommand] -> offaxis_om[DfsWavefront]$
+        1: integrator[M2ASMAsmCommand] -> offaxis_om
         1: add_m1_bm[M1ModeShapes] -> offaxis_om
         1: add_m1_rbm[M1RigidBodyMotions] -> offaxis_om
+        10: offaxis_om[DfsWavefront]$
     );
 
-    let logs = agws_oiwfs_dfs_logging_1.lock().await;
+    let mut logs = agws_oiwfs_dfs_logging_10.lock().await;
     println!("{}", logs);
-
+    agws_oiwfs_logging_10
+        .lock()
+        .await
+        .to_parquet("agws_oiwfs_data_10.parquet")?;
+    logs.to_parquet("agws_oiwfs_dfs_data_10.parquet")?;
     // logs.iter("M1RigidBodyMotions")?
     //     .last()
     //     .map(|x: Vec<f64>| x.into_iter().map(|x| x * 1e9).collect::<Vec<_>>())
@@ -413,6 +444,7 @@ pub enum LtwsData {}
 
 #[derive(UID)]
 pub enum Sh48Data {}
+impl MergedReconstructorSh48 for Sh48Data {}
 
 #[derive(UID)]
 pub enum LtwsResidualAsmCmd {}
@@ -439,9 +471,11 @@ impl From<Reconstructor> for DfsReconstructor {
 }
 impl DfsReconstructor {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
-        let recon: Reconstructor =
+        let recon: Reconstructor<ClosedLoopCalib> =
             serde_pickle::from_reader(File::open(path.as_ref()).unwrap(), Default::default())
                 .unwrap();
+        let mut recon = recon.collapse();
+        recon.pseudoinverse();
         println!("{recon}");
         Self {
             recon,
