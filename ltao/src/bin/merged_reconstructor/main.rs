@@ -6,7 +6,7 @@ use gmt_dos_clients::print;
 use gmt_dos_clients_crseo::{
     calibration::{
         Block, Calib, CalibProps, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate, Collapse,
-        Reconstructor,
+        MirrorMode, Reconstructor,
     },
     sensors::{
         Camera, DispersedFringeSensor, DispersedFringeSensorProcessing, NoSensor, WaveSensor,
@@ -21,7 +21,7 @@ use gmt_dos_clients_io::{
         Dev, Frame, SensorData, WfeRms,
     },
 };
-use grsim_ltao::MergedReconstructor;
+use grsim_ltao::{MergedReconstructor, Sh48Data};
 use interface::{Read, Update, Write};
 use skyangle::Conversion;
 
@@ -66,7 +66,7 @@ fn main() -> anyhow::Result<()> {
     let m2_mode = CalibrationMode::modes(M2_N_MODE, 1e-6);
 
     // SH48 BMS CALIBRATION
-    let mut calib_sh48_bm_bd: Reconstructor =
+    let mut calib_sh48_bm_bd: Reconstructor<MirrorMode> =
         if let Ok(file) = File::open(path.join("calib_sh48_bm.pkl")) {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -88,10 +88,10 @@ fn main() -> anyhow::Result<()> {
             )?;
             calib_sh48_bm_bd
         };
-    println!("SH48 BMS CALIBRATION: {calib_sh48_bm_bd}");
+    println!("SH48 BMS CALIBRATION: {}", calib_sh48_bm_bd.pseudoinverse());
 
     // SH48 RBMS CALIBRATION
-    let mut calib_sh48_rbm_bd: Reconstructor =
+    let mut calib_sh48_rbm_bd: Reconstructor<MirrorMode> =
         if let Ok(file) = File::open(path.join("calib_sh48_rbm.pkl")) {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -113,10 +113,13 @@ fn main() -> anyhow::Result<()> {
             )?;
             calib_sh48_rbm_bd
         };
-    println!("SH48 RBMS CALIBRATION: {calib_sh48_rbm_bd}");
+    println!(
+        "SH48 RBMS CALIBRATION: {}",
+        calib_sh48_rbm_bd.pseudoinverse()
+    );
 
     // DFS RBMS CALIBRATION
-    let mut calib_dfs_rbm_col: Reconstructor =
+    let mut calib_dfs_rbm_col: Reconstructor<MirrorMode> =
         if let Ok(file) = File::open(path.join("calib_dfs_rbm.pkl")) {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -136,10 +139,13 @@ fn main() -> anyhow::Result<()> {
             )?;
             calib_dfs_rbm_col
         };
-    println!("SH48 DFS CALIBRATION: {calib_dfs_rbm_col}");
+    println!(
+        "DFS RBMS CALIBRATION: {}",
+        calib_dfs_rbm_col.pseudoinverse()
+    );
 
     // DFS BMS CALIBRATION
-    let mut calib_dfs_bm_col: Reconstructor =
+    let mut calib_dfs_bm_col: Reconstructor<MirrorMode> =
         if let Ok(file) = File::open(path.join("calib_dfs_bm.pkl")) {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -159,53 +165,53 @@ fn main() -> anyhow::Result<()> {
             )?;
             calib_dfs_bm_col
         };
-    println!("DFS BMS CALIBRATION: {calib_dfs_bm_col}");
+    println!("DFS BMS CALIBRATION: {}", calib_dfs_bm_col.pseudoinverse());
 
-    calib_sh48_rbm_bd.pseudoinverse();
-    println!("{calib_sh48_rbm_bd}");
-    calib_sh48_bm_bd.pseudoinverse();
-    println!("{calib_sh48_bm_bd}");
+    // calib_sh48_rbm_bd.pseudoinverse();
+    // println!("{calib_sh48_rbm_bd}");
+    // calib_sh48_bm_bd.pseudoinverse();
+    // println!("{calib_sh48_bm_bd}");
 
     println!("Merging the SH48 RBMs & BMs calibration matrices");
     let mut sh48_merged_recon =
-        <Reconstructor as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
+        <Reconstructor<_> as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
     sh48_merged_recon.normalize();
     sh48_merged_recon.pseudoinverse();
     println!("{sh48_merged_recon}");
 
     println!("Normalizing & merging the SH48 RBMs & BMs calibration matrices");
     let mut sh48_merged_recon0 =
-        <Reconstructor as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
+        <Reconstructor<_> as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
     let norm_sh48_rbm = calib_sh48_rbm_bd.normalize();
     let norm_sh48_bm = calib_sh48_bm_bd.normalize();
     let mut sh48_merged_recon =
-        <Reconstructor as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
+        <Reconstructor<_> as Block>::block(&[&[&calib_sh48_rbm_bd, &calib_sh48_bm_bd]]);
     let norm_sh48 = sh48_merged_recon.normalize();
     sh48_merged_recon.pseudoinverse();
     println!("{sh48_merged_recon}");
 
-    let calib_dfs_rbm_7: Reconstructor = Calib::builder()
+    let calib_dfs_rbm_7: Reconstructor<_> = Calib::<MirrorMode>::builder()
         .sid(7)
         .c(vec![0.; 36 * 2])
         .n_mode(6)
         .n_cols(2)
-        .mode(m1_rbm.clone())
+        .mode(m1_rbm.into())
         .mask(vec![true; 36])
         .build()
         .into();
 
-    let calib_dfs_bm_7: Reconstructor = Calib::builder()
+    let calib_dfs_bm_7: Reconstructor<_> = Calib::<MirrorMode>::builder()
         .sid(7)
         .c(vec![0.; 36 * M1_N_MODE])
         .n_mode(M1_N_MODE)
         .n_cols(M1_N_MODE)
-        .mode(m1_bm.clone())
+        .mode(m1_bm.into())
         .mask(vec![true; 36])
         .build()
         .into();
 
     println!("Merging the DFS RBMs & BMs calibration matrices");
-    let mut dfs_merged_recon = <Reconstructor as Block>::block(&[&[
+    let mut dfs_merged_recon = <Reconstructor<_> as Block>::block(&[&[
         &calib_dfs_rbm_col,
         &calib_dfs_rbm_7,
         &calib_dfs_bm_col,
@@ -216,7 +222,7 @@ fn main() -> anyhow::Result<()> {
     println!("{dfs_merged_recon}");
 
     println!("Normalizing & merging the DFS RBMs & BMs calibration matrices");
-    let mut dfs_merged_recon0 = <Reconstructor as Block>::block(&[&[
+    let mut dfs_merged_recon0 = <Reconstructor<_> as Block>::block(&[&[
         &calib_dfs_rbm_col,
         &calib_dfs_rbm_7,
         &calib_dfs_bm_col,
@@ -224,7 +230,7 @@ fn main() -> anyhow::Result<()> {
     ]]);
     let norm_dfs_rbm = calib_dfs_rbm_col.normalize();
     let norm_dfs_bm = calib_dfs_bm_col.normalize();
-    let mut dfs_merged_recon = <Reconstructor as Block>::block(&[&[
+    let mut dfs_merged_recon = <Reconstructor<_> as Block>::block(&[&[
         &calib_dfs_rbm_col,
         &calib_dfs_rbm_7,
         &calib_dfs_bm_col,
@@ -236,9 +242,10 @@ fn main() -> anyhow::Result<()> {
 
     println!("Merged reconstructor");
     let mut merged_recon0 =
-        <Reconstructor as Block>::block(&[&[&sh48_merged_recon0], &[&dfs_merged_recon0]]);
-    let mut merged_recon =
-        <Reconstructor as Block>::block(&[&[&sh48_merged_recon], &[&dfs_merged_recon]]);
+        <Reconstructor<_> as Block>::block(&[&[&sh48_merged_recon0], &[&dfs_merged_recon0]]);
+    let mut q = sh48_merged_recon0.clone();
+    q.normalize();
+    let mut merged_recon = <Reconstructor<_> as Block>::block(&[&[&q], &[&dfs_merged_recon]]);
     println!("{merged_recon}");
     println!("Computing the pseudo-inverse of the merged reconstructor ...");
     let now = std::time::Instant::now();
@@ -268,14 +275,15 @@ fn main() -> anyhow::Result<()> {
     let mut sh48_om = sh48_om_builder.build()?;
     println!("{sh48_om}");
 
-    let dfs_recon: Reconstructor<ClosedLoopCalib> = serde_pickle::from_reader(
+    let dfs_recon: Reconstructor<CalibrationMode, ClosedLoopCalib> = serde_pickle::from_reader(
         File::open("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl")?,
         Default::default(),
     )?;
-    let mut sh48_recon: Reconstructor<ClosedLoopCalib> = serde_pickle::from_reader(
-        File::open("src/bin/agws_oiwfs/calib_sh48_bm.pkl")?,
-        Default::default(),
-    )?;
+    let mut sh48_recon: Reconstructor<CalibrationMode, ClosedLoopCalib> =
+        serde_pickle::from_reader(
+            File::open("src/bin/agws_oiwfs/calib_sh48_bm.pkl")?,
+            Default::default(),
+        )?;
 
     let mut m1_rxy = vec![vec![0f64; 2]; 7];
     m1_rxy[0][0] = 0.1f64.from_arcsec();
@@ -290,8 +298,8 @@ fn main() -> anyhow::Result<()> {
         .collect();
 
     let mut m1_bm = vec![vec![0f64; M1_N_MODE]; 7];
-    m1_bm[0][0] = 1e-4;
-    m1_bm[6][4] = 1e-5;
+    // m1_bm[0][0] = 1e-4;
+    // m1_bm[6][4] = 1e-5;
     let m1_bm_cmd: Vec<_> = sh48_recon
         .calib_slice()
         .iter()
@@ -389,7 +397,7 @@ fn main() -> anyhow::Result<()> {
     <OpticalModel<Camera<1>> as Write<Frame<Dev>>>::write(&mut sh48_om)
         .map(|data| <Centroids as Read<Frame<Dev>>>::read(&mut sh48_centroids, data));
     sh48_centroids.update();
-    let sh48_y0 = <Centroids as Write<SensorData>>::write(&mut sh48_centroids).unwrap();
+    let sh48_y0 = <Centroids as Write<Sh48Data>>::write(&mut sh48_centroids).unwrap();
     let sh48_y = sh48_merged_recon0.calib_slice()[0].mask(&sh48_y0.as_arc());
 
     dbg!(sh48_y.len());
@@ -470,7 +478,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut merged = MergedReconstructor::new();
     <MergedReconstructor as Read<Intercepts>>::read(&mut merged, dfs_y);
-    <MergedReconstructor as Read<SensorData>>::read(&mut merged, sh48_y0);
+    <MergedReconstructor as Read<Sh48Data>>::read(&mut merged, sh48_y0);
     merged.update();
     let rbm = <MergedReconstructor as Write<M1RigidBodyMotions>>::write(&mut merged).unwrap();
     let bm = <MergedReconstructor as Write<M1ModeShapes>>::write(&mut merged).unwrap();
