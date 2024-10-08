@@ -189,8 +189,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dbg!(<OpticalModel as Write<WfeRms<-9>>>::write(&mut om));
 
     <OpticalModel<DFS> as Read<M1RigidBodyMotions>>::read(&mut dfs_om, m1_rbm.into());
-    // dbg!(&cmd[..10]);
-    // dbg!(&cmd[66..76]);
+    dbg!(&cmd[..10]);
+    dbg!(&cmd[66..76]);
     <OpticalModel<DFS> as Read<M2ASMAsmCommand>>::read(&mut dfs_om, cmd.into());
 
     dfs_om.update();

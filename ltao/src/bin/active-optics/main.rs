@@ -10,7 +10,10 @@ use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signal, Signals, Timer};
 use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode, Reconstructor},
-    sensors::{Camera, CameraBuilder, NoSensor, WaveSensor, WaveSensorBuilder},
+    sensors::{
+        builders::{CameraBuilder, WaveSensorBuilder},
+        Camera, NoSensor, WaveSensor,
+    },
     Centroids, DeviceInitialize, OpticalModel,
 };
 use gmt_dos_clients_io::{
@@ -48,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(16))
         .lenslet_flux(0.75);
     // Centroiding data processor
-    let mut centroids = Centroids::try_from(&imgr_builder)?;
+    let mut centroids: Centroids = Centroids::try_from(&imgr_builder)?;
 
     // On-axis optical model
     let om_builder = OpticalModel::<Camera>::builder()
@@ -57,15 +60,15 @@ async fn main() -> anyhow::Result<()> {
 
     // Calibration of M2 Karhunen-Loeve modes
     let mut calib_m2_modes = <Centroids as Calibrate<GmtM2>>::calibrate(
-        om_builder.clone().into(),
+        &(&om_builder).into(),
         CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
     )?;
     calib_m2_modes.pseudoinverse();
     println!("{calib_m2_modes}");
 
+    om_builder.initialize(&mut centroids);
     let mut om = om_builder.build()?;
     // centroids.setup(&mut om);
-    om.initialize(&mut centroids);
     dbg!(centroids.n_valid_lenslets());
 
     // M1 Rx & Ry commands
@@ -91,9 +94,7 @@ async fn main() -> anyhow::Result<()> {
     let oom = OpticalModel::<WaveSensor>::builder()
         .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
         .source(srcs.clone())
-        .sensor(WaveSensorBuilder(
-            OpticalModel::<NoSensor>::builder().source(srcs.clone()),
-        ))
+        .sensor(WaveSensor::builder().source(srcs.clone()))
         .build()?;
 
     // Active optics reconstructor
@@ -161,7 +162,7 @@ async fn main() -> anyhow::Result<()> {
             )
         });
 
-    {
+    /*     {
         let mut oml = om.lock().await;
         let n = oml.src.pupil_sampling() as usize;
         let phase: Vec<_> = oml.src.phase().iter().map(|x| *x * 1e9).collect();
@@ -191,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
             )
                 .into();
         });
-    }
+    }*/
 
     Ok(())
 }

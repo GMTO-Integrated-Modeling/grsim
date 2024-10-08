@@ -4,7 +4,7 @@ use crseo::{
 };
 use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode},
-    sensors::{NoSensor, WaveSensor, WaveSensorBuilder},
+    sensors::{builders::WaveSensorBuilder, NoSensor, WaveSensor},
     OpticalModel,
 };
 use skyangle::Conversion;
@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
         let mut rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
             &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
-                .sensor(WaveSensorBuilder(OpticalModel::<NoSensor>::builder())),
+                .sensor(WaveSensorBuilder::default()),
             CalibrationMode::modes(M2_N_MODE, 1e-6),
         )
         .unwrap();
@@ -36,9 +36,7 @@ fn main() -> anyhow::Result<()> {
             &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
                 .source(srcs.clone())
-                .sensor(WaveSensorBuilder(
-                    OpticalModel::<NoSensor>::builder().source(srcs),
-                )),
+                .sensor(WaveSensorBuilder::default().source(srcs)),
             CalibrationMode::modes(M2_N_MODE, 1e-6),
         )
         .unwrap();
@@ -51,8 +49,7 @@ fn main() -> anyhow::Result<()> {
     let calib_m1_rbm_onaxis = {
         println!("On-axis calibration of M1 RBM");
         let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
-            &OpticalModel::<WaveSensor>::builder()
-                .sensor(WaveSensorBuilder(OpticalModel::<NoSensor>::builder())),
+            &OpticalModel::<WaveSensor>::builder().sensor(WaveSensorBuilder::default()),
             CalibrationMode::RBM([
                 None,                     // Tx
                 None,                     // Ty
@@ -73,11 +70,9 @@ fn main() -> anyhow::Result<()> {
     let calib_m1_rbm_offaxis = {
         println!("Off-axis calibration of M1 RBM");
         let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
-            &pOpticalModel::<WaveSensor>::builder()
+            &OpticalModel::<WaveSensor>::builder()
                 .source(srcs.clone())
-                .sensor(WaveSensorBuilder(
-                    OpticalModel::<NoSensor>::builder().source(srcs),
-                )),
+                .sensor(WaveSensorBuilder::default().source(srcs)),
             CalibrationMode::RBM([
                 None,                     // Tx
                 None,                     // Ty

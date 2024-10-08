@@ -10,12 +10,12 @@ use gmt_dos_clients::{
     fun::Fun,
     gif::Gif,
     operator::{Left, Operator, Right},
-    print::{self, Print},
     Integrator, Signals, Timer,
 };
 use gmt_dos_clients_crseo::{
     calibration::{
-        Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate, Collapse, Reconstructor,
+        algebra::Collapse, Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
+        ClosedLoopReconstructor, MirrorMode, Reconstructor,
     },
     centroiding::ZeroMean,
     sensors::{
@@ -29,12 +29,16 @@ use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{
         dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
-        Dev, Frame, Host, SegmentWfeRms, SensorData, Wavefront, WfeRms,
+        Dev, Frame, Host, SegmentWfeRms, Wavefront, WfeRms,
     },
 };
 use gmt_dos_clients_scope::server::{Monitor, Scope};
-use grsim_ltao::{MergedReconstructor, MergedReconstructorSh48};
-use interface::{units::Mas, Data, Read, Tick, Units, Update, Write, UID};
+use grsim_ltao::{
+    agws_reconstructor::{Disjoined, Merged},
+    AgwsReconstructor, DfsWavefront, LtwsData, LtwsResidualAsmCmd, M1ModesNorm, M1Rxy, OiwfsData,
+    OiwfsResidualAsmCmd, Sh48Data,
+};
+use interface::{Data, Read, Tick, Units, Update};
 use nanorand::{Rng, WyRand};
 use skyangle::Conversion;
 
@@ -110,25 +114,27 @@ async fn main() -> anyhow::Result<()> {
         .gmt(gmt_builder.clone())
         .source(agws_gs_builder.clone())
         .sensor(sh48);
+    let mut file = File::create("src/bin/agws_oiwfs/sh48.ron")?;
+    ron::ser::to_writer_pretty(&mut file, &sh48_om_builder, Default::default())?;
 
     sh48_om_builder.initialize(&mut sh48_centroids);
     dbg!(sh48_centroids.n_valid_lenslets());
 
-    let mut calib_sh48_bm: Reconstructor<ClosedLoopCalib> =
-        if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_sh48_bm.pkl") {
+    let calib_sh48_bm: ClosedLoopReconstructor =
+        if let Ok(file) = File::open(format!("src/bin/agws_oiwfs/calib_sh48_{M1_N_MODE}bm.pkl")) {
             serde_pickle::from_reader(file, Default::default())?
         } else {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
             let mut calib_sh48_bm = <Centroids as ClosedLoopCalibrate<WaveSensor>>::calibrate(
-                sh48_om_builder.clone().into(),
+                &sh48_om_builder.clone().into(),
                 CalibrationMode::modes(M1_N_MODE, 1e-4),
-                closed_loop_optical_model,
+                &closed_loop_optical_model,
                 CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
             )?;
             calib_sh48_bm.pseudoinverse();
             serde_pickle::to_writer(
-                &mut File::create("src/bin/agws_oiwfs/calib_sh48_bm.pkl")?,
+                &mut File::create(format!("src/bin/agws_oiwfs/calib_sh48_{M1_N_MODE}bm.pkl"))?,
                 &calib_sh48_bm,
                 Default::default(),
             )?;
@@ -136,7 +142,7 @@ async fn main() -> anyhow::Result<()> {
         };
     println!("{calib_sh48_bm}");
 
-    let mut sh48_om = sh48_om_builder.build()?;
+    let sh48_om = sh48_om_builder.build()?;
     println!("{sh48_om}");
     // ... AGWS SH48
 
@@ -150,7 +156,7 @@ async fn main() -> anyhow::Result<()> {
         .source(Source::builder().band("K"))
         .sensor(oiwfs);
 
-    let mut calib_oiwfs_tt: Reconstructor =
+    let calib_oiwfs_tt: Reconstructor =
         if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_oiwfs_tt.pkl") {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -191,7 +197,7 @@ async fn main() -> anyhow::Result<()> {
         .source(Source::builder().band("V"))
         .sensor(ltws);
 
-    let mut calib_m2_modes: Reconstructor =
+    let calib_m2_modes: Reconstructor =
         if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_m2_modes.pkl") {
             serde_pickle::from_reader(file, Default::default())?
         } else {
@@ -260,8 +266,25 @@ async fn main() -> anyhow::Result<()> {
     let wfe_rms_scope = Scope::<WfeRms<-9>>::builder(&mut monitor)
         .sampling_frequency(sampling_frequency as f64)
         .build()?;
+    let m1_bm_scope = Scope::<M1ModesNorm>::builder(&mut monitor)
+        .sampling_frequency(sampling_frequency as f64)
+        .build()?;
+    let m1_rxy_scope = Scope::<M1Rxy>::builder(&mut monitor)
+        .sampling_frequency(sampling_frequency as f64)
+        .build()?;
 
     let timer: Timer = Timer::new(N_STEP / 2);
+
+    let m1_bm_norm = Fun::new(|x: &Vec<f64>| {
+        x.chunks(M1_N_MODE)
+            .map(|x| (x.iter().map(|x| x * x).sum::<f64>() / M1_N_MODE as f64).sqrt())
+            .collect::<Vec<f64>>()
+    });
+    let m1_rxy_norm = Fun::new(|x: &Vec<f64>| {
+        x.chunks(6)
+            .map(|x| x[3].hypot(x[4]).to_mas())
+            .collect::<Vec<f64>>()
+    });
     // let print = Print::default();
     actorscript!(
         #[model(name=agws_oiwfs)]
@@ -278,6 +301,8 @@ async fn main() -> anyhow::Result<()> {
             m1_bm="M1 BM")]
         // LTWFS
         1: timer[Tick] -> ltws_om
+        1: m1_bm[M1ModeShapes] -> m1_bm_norm[M1ModesNorm] -> m1_bm_scope
+        1: m1_rbm[M1RigidBodyMotions] -> m1_rxy_norm[M1Rxy] -> m1_rxy_scope
         1: m1_bm[M1ModeShapes] -> ltws_om
         1: m1_rbm[M1RigidBodyMotions] -> ltws_om[Frame<Dev>]!
             -> ltws_centroids[LtwsData]
@@ -328,7 +353,7 @@ async fn main() -> anyhow::Result<()> {
     //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl");
     // let dfs_recon =
     //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-21bm.pkl");
-    let mut merged_recon = MergedReconstructor::new();
+    let agws_recon = AgwsReconstructor::<Merged>::new()?;
 
     let dfs_integrator = Integrator::new(42).gain(0.5);
     let sh48_integrator = Integrator::new(M1_N_MODE * 7).gain(0.5);
@@ -337,7 +362,7 @@ async fn main() -> anyhow::Result<()> {
 
     let oiwfs_gif = Gif::new("oiwfs_dfs.gif", 512, 512)?;
 
-    let timer: Timer = Timer::new(120);
+    // let timer: Timer = Timer::new(120);
     // let print_dfs = Print::default().tag("DFS");
     actorscript!(
         #[model(name=agws_oiwfs_dfs)]
@@ -357,12 +382,14 @@ async fn main() -> anyhow::Result<()> {
             add_m1_rbm="Add M1 RBMs",
             add_m1_bm="Add M1 BMs",
             m1_bm="M1 BM",
-            merged_recon="SH48 + DFS\n -> M1 RBM\n -> M1 BM",
+            agws_recon="SH48 + DFS\n -> M1 RBM\n -> M1 BM",
             dfs_processor="DFS fftlets\nprocessing",
             wfe_rms_scope="\u{1F4DF}",segment_wfe_rms_scope="\u{1F4DF}")]
         // LTWFS
         // 1: timer[Tick] -> ltws_om
         1: m1_bm[Left<M1ModeShapes>] -> add_m1_bm[M1ModeShapes] -> ltws_om
+        1: add_m1_bm[M1ModeShapes] -> m1_bm_norm[M1ModesNorm] -> m1_bm_scope
+        1: add_m1_rbm[M1RigidBodyMotions] -> m1_rxy_norm[M1Rxy] -> m1_rxy_scope
         1: m1_rbm[Left<M1RigidBodyMotions>] -> add_m1_rbm[M1RigidBodyMotions]
         -> ltws_om[Frame<Dev>]!
             -> ltws_centroids[LtwsData]
@@ -386,16 +413,16 @@ async fn main() -> anyhow::Result<()> {
         1: integrator[M2ASMAsmCommand] -> dfs_om
         1: add_m1_bm[M1ModeShapes] -> dfs_om
         1: add_m1_rbm[M1RigidBodyMotions] -> dfs_om
-        10: dfs_om[DfsFftFrame<Dev>]! -> dfs_processor[Intercepts] -> merged_recon
+        10: dfs_om[DfsFftFrame<Dev>]! -> dfs_processor[Intercepts] -> agws_recon
             //  -> dfs_recon[Mas<M1Rxy>] -> print_dfs
-        10: merged_recon[M1RigidBodyMotions] -> dfs_integrator[Right<M1RigidBodyMotions>] -> add_m1_rbm
+        10: agws_recon[M1RigidBodyMotions] -> dfs_integrator[Right<M1RigidBodyMotions>] -> add_m1_rbm
         // SH48
         1: integrator[M2ASMAsmCommand] -> sh48_om
         1: add_m1_rbm[M1RigidBodyMotions] -> sh48_om
         1: add_m1_bm[M1ModeShapes] -> sh48_om
         10: sh48_om[Frame<Dev>]!
             -> sh48_centroids[Sh48Data]
-                -> merged_recon[M1ModeShapes]
+                -> agws_recon[M1ModeShapes]
                     -> sh48_integrator[Right<M1ModeShapes>]
                         -> add_m1_bm
 
@@ -431,37 +458,13 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(UID)]
-#[alias(name=Wavefront, client=OpticalModel<WaveSensor>, traits=Write,Size)]
-pub enum DfsWavefront {}
-
-#[derive(UID)]
-#[alias(name=Wavefront, client=OpticalModel<Camera<1>>, traits=Write,Size)]
-pub enum OiwfsWavefront {}
-
-#[derive(UID)]
-pub enum LtwsData {}
-
-#[derive(UID)]
-pub enum Sh48Data {}
-impl MergedReconstructorSh48 for Sh48Data {}
-
-#[derive(UID)]
-pub enum LtwsResidualAsmCmd {}
-
-#[derive(UID)]
-pub enum OiwfsResidualAsmCmd {}
-
-#[derive(UID)]
-pub enum OiwfsData {}
-
 pub struct DfsReconstructor {
-    recon: Reconstructor,
+    recon: Reconstructor<MirrorMode>,
     intercepts: Arc<Vec<f64>>,
     rxy: Vec<f64>,
 }
-impl From<Reconstructor> for DfsReconstructor {
-    fn from(recon: Reconstructor) -> Self {
+impl From<Reconstructor<MirrorMode>> for DfsReconstructor {
+    fn from(recon: Reconstructor<MirrorMode>) -> Self {
         Self {
             recon,
             intercepts: Default::default(),
@@ -471,7 +474,7 @@ impl From<Reconstructor> for DfsReconstructor {
 }
 impl DfsReconstructor {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
-        let recon: Reconstructor<ClosedLoopCalib> =
+        let recon: Reconstructor<CalibrationMode, ClosedLoopCalib<CalibrationMode>> =
             serde_pickle::from_reader(File::open(path.as_ref()).unwrap(), Default::default())
                 .unwrap();
         let mut recon = recon.collapse();
@@ -497,16 +500,13 @@ impl Read<Intercepts> for DfsReconstructor {
     }
 }
 
-#[derive(UID)]
-pub enum M1Rxy {}
-
-impl Write<M1Rxy> for DfsReconstructor {
+impl interface::Write<M1Rxy> for DfsReconstructor {
     fn write(&mut self) -> Option<Data<M1Rxy>> {
         Some(self.rxy.clone().into())
     }
 }
 
-impl Write<M1RigidBodyMotions> for DfsReconstructor {
+impl interface::Write<M1RigidBodyMotions> for DfsReconstructor {
     fn write(&mut self) -> Option<Data<M1RigidBodyMotions>> {
         let mut m1_rbm: Vec<f64> = self
             .rxy
@@ -524,7 +524,7 @@ impl Write<M1RigidBodyMotions> for DfsReconstructor {
     }
 }
 
-impl Write<M1ModeShapes> for DfsReconstructor {
+impl interface::Write<M1ModeShapes> for DfsReconstructor {
     fn write(&mut self) -> Option<Data<M1ModeShapes>> {
         let mut m1_bm = self.rxy.clone();
         m1_bm.extend(vec![0f64; M1_N_MODE]);

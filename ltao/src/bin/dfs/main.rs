@@ -5,9 +5,9 @@ use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Sampler, Signal, Signals, Timer};
 use gmt_dos_clients_arrow::Arrow;
 use gmt_dos_clients_crseo::{
-    calibration::{Calibrate, CalibrationMode},
+    calibration::{algebra::Collapse, Calibrate, CalibrationMode},
     sensors::{DispersedFringeSensor, DispersedFringeSensorProcessing},
-    OpticalModel,
+    DeviceInitialize, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
@@ -50,12 +50,17 @@ async fn main() -> anyhow::Result<()> {
     let calib_m1_tz = if let Ok(file) = File::open("calib_m1_tz.pkl") {
         serde_pickle::from_reader(&file, Default::default()).unwrap()
     } else {
-        let mut calib_m1_tz = <DFSP11 as Calibrate<GmtM1>>::calibrate(
+        let mut calib_m1_tz = <DFSP11 as Calibrate<GmtM1>>::calibrate_serial(
             &OpticalModel::<DFS11>::builder()
                 .source(src_builder.clone())
-                .sensor(DFS11::builder().nyquist_factor(3.)),
-            CalibrationMode::RBM([None, None, Some(1e-6), None, None, None]),
-        )?;
+                .sensor(
+                    DFS11::builder()
+                        .source(src_builder.clone())
+                        .nyquist_factor(3.),
+                ),
+            [CalibrationMode::RBM([None, None, Some(1e-6), None, None, None]); 6],
+        )?
+        .collapse();
         calib_m1_tz.pseudoinverse();
         println!("{calib_m1_tz}");
         let mut file = File::create("calib_m1_tz.pkl")?;
@@ -78,15 +83,7 @@ async fn main() -> anyhow::Result<()> {
     dbg!((n, n_fft));
 
     let mut dfs_processor = DispersedFringeSensorProcessing::new();
-    {
-        let mut om_dfs11 = OpticalModel::<DFS11>::builder()
-            .source(src_builder.clone())
-            .sensor(DFS11::builder().nyquist_factor(3.))
-            .build()?;
-        om_dfs11.update();
-        let mut dfsp11 = DispersedFringeSensorProcessing::from(om_dfs11.sensor().unwrap());
-        dfs_processor.set_reference(dfsp11.intercept());
-    }
+    om_builder.initialize(&mut dfs_processor);
 
     {
         let print = Print::default();
@@ -99,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
             )
         });
 
-        let to_nm = Gain::new(vec![1e9; 6]);
+        let to_nm = Gain::new(vec![1e9; 6 * 6]);
 
         actorscript!(
             1: m1_rbm[M1RigidBodyMotions] -> om
