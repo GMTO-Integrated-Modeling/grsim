@@ -8,10 +8,9 @@ use gmt_dos_clients_crseo::{
         Calib, Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
         ClosedLoopReconstructor, MirrorMode, MixedMirrorMode, Reconstructor,
     },
-    sensors::{
-        Camera, DispersedFringeSensor, DispersedFringeSensorProcessing, NoSensor, WaveSensor,
-    },
-    Centroids, DeviceInitialize, OpticalModel,
+    centroiding::CentroidsProcessing,
+    sensors::{Camera, DispersedFringeSensor, NoSensor, WaveSensor},
+    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::{M1ModeShapes, M1RigidBodyMotions},
@@ -88,12 +87,13 @@ fn main() -> anyhow::Result<()> {
         } else {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
-            let mut calib_sh48_bm = <Centroids as ClosedLoopCalibrate<WaveSensor>>::calibrate(
-                &((&sh48_om_builder).into()),
-                m1_bm.clone(),
-                &closed_loop_optical_model,
-                m2_mode.clone().start_from(2),
-            )?;
+            let mut calib_sh48_bm =
+                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                    &((&sh48_om_builder).into()),
+                    m1_bm.clone(),
+                    &closed_loop_optical_model,
+                    m2_mode.clone().start_from(2),
+                )?;
             calib_sh48_bm.pseudoinverse();
             println!("{calib_sh48_bm}");
             // let calib_sh48_bm_bd = calib_sh48_bm.diagonal();
@@ -113,12 +113,13 @@ fn main() -> anyhow::Result<()> {
         } else {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
-            let mut calib_sh48_rbm = <Centroids as ClosedLoopCalibrate<WaveSensor>>::calibrate(
-                &((&sh48_om_builder).into()),
-                m1_rbm.clone(),
-                &closed_loop_optical_model,
-                m2_mode.clone().start_from(2),
-            )?;
+            let mut calib_sh48_rbm =
+                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                    &((&sh48_om_builder).into()),
+                    m1_rbm.clone(),
+                    &closed_loop_optical_model,
+                    m2_mode.clone().start_from(2),
+                )?;
             calib_sh48_rbm.pseudoinverse();
             println!("{calib_sh48_rbm}");
             // let calib_sh48_rbm_bd = calib_sh48_rbm.diagonal();
@@ -136,7 +137,7 @@ fn main() -> anyhow::Result<()> {
     {
         serde_pickle::from_reader(file, Default::default())?
     } else {
-        let mut calib_sh48_tz = <Centroids as Calibrate<GmtM1>>::calibrate(
+        let mut calib_sh48_tz = <CentroidsProcessing as Calibrate<GmtM1>>::calibrate(
             &((&sh48_om_builder).into()),
             m1_tz.clone(),
         )?;
@@ -598,7 +599,7 @@ mod tests {
     use std::marker::PhantomData;
 
     use gmt_dos_clients_crseo::calibration::Modality;
-    use grsim_ltao::Sh48Data;
+    use grsim_ltao::{agws_reconstructor::Disjoined, AgwsReconstructor, Sh48Data};
     use interface::Data;
     use serde::Deserialize;
 
@@ -1016,6 +1017,31 @@ mod tests {
                 c.iter().take(6).map(|x| x * 1e4).collect::<Vec<_>>()
             )
         });
+        Ok(())
+    }
+
+    #[test]
+    fn disjoined() -> anyhow::Result<()> {
+        let mut model = Model::new()?;
+        model
+            .dfs_rxy_recon()?
+            // .sh48_bm_recon()?
+            .m1s_rxy_i(1, 0, 0f64.from_mas())
+            // .m1s_bm_i(1, 0, 1e-4)
+            .update();
+
+        let mut agws_recon = AgwsReconstructor::<Disjoined>::new(M1_N_MODE)?;
+
+        <AgwsReconstructor as Read<Intercepts>>::read(&mut agws_recon, model.process_dfs());
+        <AgwsReconstructor as Read<Sh48Data>>::read(&mut agws_recon, model.process_sh48());
+        agws_recon.update();
+
+        <AgwsReconstructor as Write<M1RigidBodyMotions>>::write(&mut agws_recon).map(|data| {
+            data.as_arc()
+                .chunks(6)
+                .for_each(|x| println!("[{:5.0},{:5.0}]", x[3].to_mas(), x[4].to_mas()))
+        });
+
         Ok(())
     }
     /*
