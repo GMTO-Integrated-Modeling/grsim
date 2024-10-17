@@ -1,26 +1,14 @@
 use std::{fs::File, path::Path};
 
 use crseo::{gmt::GmtM1, imaging::LensletArray, FromBuilder, Gmt, Source};
-use faer::mat::from_column_major_slice;
 use gmt_dos_clients_crseo::{
     calibration::{
-        algebra::{Block, CalibProps, Collapse},
-        Calib, Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
+        algebra::{Block, CalibProps, Collapse}, Calibrate, CalibrationMode, ClosedLoopCalibrate,
         ClosedLoopReconstructor, MirrorMode, MixedMirrorMode, Reconstructor,
     },
     centroiding::CentroidsProcessing,
-    sensors::{Camera, DispersedFringeSensor, NoSensor, WaveSensor},
-    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
+    sensors::{Camera, DispersedFringeSensor, WaveSensor}, DispersedFringeSensorProcessing, OpticalModel,
 };
-use gmt_dos_clients_io::{
-    gmt_m1::{M1ModeShapes, M1RigidBodyMotions},
-    gmt_m2::asm::M2ASMAsmCommand,
-    optics::{
-        dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
-        Dev, Frame, WfeRms,
-    },
-};
-use interface::{Read, Update, Write};
 use skyangle::Conversion;
 
 const M1_N_MODE: usize = 27;

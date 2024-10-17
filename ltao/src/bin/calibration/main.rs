@@ -4,7 +4,7 @@ use crseo::{
 };
 use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode},
-    sensors::{builders::WaveSensorBuilder, NoSensor, WaveSensor},
+    sensors::{builders::WaveSensorBuilder, WaveSensor},
     OpticalModel,
 };
 use skyangle::Conversion;
@@ -16,7 +16,7 @@ fn main() -> anyhow::Result<()> {
     let calib_m2_modes_onaxis = {
         // On-axis calibration of M2 RBM
         println!("On-axis calibration of M2 RBM");
-        let mut rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
+        let rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
             &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
                 .sensor(WaveSensorBuilder::default()),
@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     let calib_m2_modes_offaxis = {
         // Off-axis calibration of M2 modes
         println!("Off-axis calibration of M2 modes");
-        let mut rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
+        let rec = <WaveSensor as Calibrate<GmtM2>>::calibrate(
             &OpticalModel::<WaveSensor>::builder()
                 .gmt(Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE))
                 .source(srcs.clone())
@@ -48,7 +48,7 @@ fn main() -> anyhow::Result<()> {
     // On-axis calibration of M1 RBM
     let calib_m1_rbm_onaxis = {
         println!("On-axis calibration of M1 RBM");
-        let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
+        let rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
             &OpticalModel::<WaveSensor>::builder().sensor(WaveSensorBuilder::default()),
             CalibrationMode::RBM([
                 None,                     // Tx
@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
     let srcs = Source::builder().size(3).on_ring(6f32.from_arcmin());
     let calib_m1_rbm_offaxis = {
         println!("Off-axis calibration of M1 RBM");
-        let mut rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
+        let rec = <WaveSensor as Calibrate<GmtM1>>::calibrate(
             &OpticalModel::<WaveSensor>::builder()
                 .source(srcs.clone())
                 .sensor(WaveSensorBuilder::default().source(srcs)),

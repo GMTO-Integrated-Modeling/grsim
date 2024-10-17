@@ -3,8 +3,8 @@ use std::fs::File;
 use crseo::{FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
     calibration::{Calib, CalibrationMode, Reconstructor},
-    sensors::{DispersedFringeSensor, DispersedFringeSensorProcessing, NoSensor},
-    DeviceInitialize, OpticalModel,
+    sensors::{DispersedFringeSensor, NoSensor},
+    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &m1_to_m2,
         Default::default(),
     )?; */
-    let mut m1_to_m2: Vec<faer::Mat<f64>> = serde_pickle::from_reader(
+    let m1_to_m2: Vec<faer::Mat<f64>> = serde_pickle::from_reader(
         &mut std::fs::File::open("src/bin/dfs_calibration/m1_to_m2.pkl")?,
         Default::default(),
     )?;
@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let agws_gs_builder = Source::builder().size(3).on_ring(6f32.from_arcmin());
     let gmt_builder = Gmt::builder().m2("Karhunen-Loeve", m1_to_m2[0].nrows());
 
-    let mut dfs_om_builder = OpticalModel::<DFS>::builder()
+    let dfs_om_builder = OpticalModel::<DFS>::builder()
         .gmt(gmt_builder.clone())
         .source(agws_gs_builder.clone())
         .sensor(
@@ -168,7 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", cmd.len());
     // let q = &recon * vec![c];
 
-    let mut m1_rbm: Vec<f64> = m1_rxy
+    let m1_rbm: Vec<f64> = m1_rxy
         .into_iter()
         .flat_map(|rxy| {
             vec![0.; 3]

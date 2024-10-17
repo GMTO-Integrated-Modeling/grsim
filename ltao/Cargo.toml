@@ -8,7 +8,6 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 publish.workspace = true
-default-run = "ltao"
 
 [dependencies]
 anyhow.workspace = true
@@ -28,7 +27,6 @@ gmt_dos-clients_servos = "2.1.0"
 gmt_dos-clients_windloads.workspace = true
 faer = "0.19.3"
 nanorand = "0.7.0"
+ron = "0.8.1"
+serde = "1.0.210"
 
-[[bin]]
-name = "ltao"
-path = "src/main.rs"

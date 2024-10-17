@@ -1,7 +1,7 @@
 use std::fs::File;
 
 use gmt_dos_clients_crseo::calibration::{
-    algebra::CalibProps, MirrorMode, MixedMirrorMode, Reconstructor,
+    algebra::CalibProps, MixedMirrorMode, Reconstructor,
 };
 use gmt_dos_clients_io::{
     gmt_m1::{M1ModeShapes, M1RigidBodyMotions},
@@ -13,7 +13,7 @@ use super::{AgwsReconstructor, AgwsSh48, Merged};
 
 impl AgwsReconstructor<Merged> {
     pub fn new() -> anyhow::Result<Self> {
-        let (mut recon, norm_dfs, norm_sh48): (Reconstructor<MixedMirrorMode>, Vec<f64>, Vec<f64>) =
+        let (recon, norm_dfs, norm_sh48): (Reconstructor<MixedMirrorMode>, Vec<f64>, Vec<f64>) =
             serde_pickle::from_reader(
                 File::open("src/bin/merged_reconstructor/merged_recon_fqp.pkl")?,
                 Default::default(),

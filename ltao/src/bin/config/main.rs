@@ -1,9 +1,10 @@
-use std::{fs::File, path::Path};
+use std::path::Path;
 
 use crseo::{imaging::LensletArray, FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
-    sensors::{Camera, WaveSensor},
-    Centroids, OpticalModel,
+    centroiding::CentroidsProcessing,
+    sensors::Camera,
+    OpticalModel,
 };
 use skyangle::Conversion;
 
@@ -27,13 +28,12 @@ fn main() -> anyhow::Result<()> {
         .n_sensor(AGWS_N_GS)
         .lenslet_array(LensletArray::default().n_side_lenslet(48).n_px_lenslet(32))
         .lenslet_flux(0.75);
-    let mut sh48_centroids: Centroids = Centroids::try_from(&sh48)?;
+    let sh48_centroids: CentroidsProcessing = CentroidsProcessing::try_from(&sh48)?;
 
     let sh48_om_builder = OpticalModel::<Camera<1>>::builder()
         .gmt(gmt_builder.clone())
         .source(agws_gs_builder.clone())
         .sensor(sh48);
 
-    
     Ok(())
 }

@@ -40,3 +40,8 @@ pub enum OiwfsResidualAsmCmd {}
 
 #[derive(UID)]
 pub enum OiwfsData {}
+
+const OIWFS: usize = 1;
+
+pub mod agws;
+pub use agws::Agws;

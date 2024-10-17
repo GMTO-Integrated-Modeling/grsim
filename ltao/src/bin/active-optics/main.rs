@@ -1,23 +1,23 @@
 use std::{fs::File, path::Path};
 
-use complot::{Config, Heatmap};
 use crseo::{
     gmt::GmtM2,
-    imaging::{ImagingBuilder, LensletArray},
+    imaging::LensletArray,
     FromBuilder, Gmt, Imaging, Source,
 };
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signal, Signals, Timer};
 use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode, Reconstructor},
+    centroiding::CentroidsProcessing,
     sensors::{
-        builders::{CameraBuilder, WaveSensorBuilder},
-        Camera, NoSensor, WaveSensor,
+        builders::CameraBuilder,
+        Camera, WaveSensor,
     },
-    Centroids, DeviceInitialize, OpticalModel,
+    DeviceInitialize, OpticalModel,
 };
 use gmt_dos_clients_io::{
-    gmt_m1::{segment::RBM, M1RigidBodyMotions},
+    gmt_m1::M1RigidBodyMotions,
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{Dev, Frame, SegmentWfeRms, SensorData, Wavefront, WfeRms},
 };
@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
         .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(16))
         .lenslet_flux(0.75);
     // Centroiding data processor
-    let mut centroids: Centroids = Centroids::try_from(&imgr_builder)?;
+    let mut centroids: CentroidsProcessing = CentroidsProcessing::try_from(&imgr_builder)?;
 
     // On-axis optical model
     let om_builder = OpticalModel::<Camera>::builder()
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .sensor(imgr_builder);
 
     // Calibration of M2 Karhunen-Loeve modes
-    let mut calib_m2_modes = <Centroids as Calibrate<GmtM2>>::calibrate(
+    let mut calib_m2_modes = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
         &(&om_builder).into(),
         CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
     )?;
@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     println!("{calib_m2_modes}");
 
     om_builder.initialize(&mut centroids);
-    let mut om = om_builder.build()?;
+    let om = om_builder.build()?;
     // centroids.setup(&mut om);
     dbg!(centroids.n_valid_lenslets());
 

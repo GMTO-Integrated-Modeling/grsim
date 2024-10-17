@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, sync::Arc};
 
 use gmt_dos_clients_crseo::calibration::{
-    ClosedLoopReconstructor, MirrorMode, MixedMirrorMode, Reconstructor,
+    ClosedLoopReconstructor, MixedMirrorMode, Reconstructor,
 };
 
 #[derive(Default)]
@@ -28,7 +28,7 @@ where
     centroids_mask: Vec<bool>,
     centroids: Vec<f64>,
     rbm: Vec<f64>,
-    rxy: Vec<f64>,
+    pub rxy: Vec<f64>,
     bm: Vec<f64>,
     kind: PhantomData<K>,
     norm_dfs: f64,

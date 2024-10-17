@@ -1,10 +1,11 @@
 use crseo::{
-    centroiding::{self, CentroidingBuilder},
+    centroiding::{CentroidingBuilder},
     imaging::{ImagingBuilder, LensletArray},
-    Builder, Centroiding, FromBuilder, Gmt, Source,
+    Builder, FromBuilder, Gmt, Source,
 };
-use gmt_dos_clients_crseo::{sensors::Camera, Centroids, DeviceInitialize, OpticalModel};
-use skyangle::Conversion;
+use gmt_dos_clients_crseo::{
+    centroiding::CentroidsProcessing, sensors::Camera, DeviceInitialize, OpticalModel,
+};
 
 fn main() -> anyhow::Result<()> {
     let n_gs = 1;
@@ -45,13 +46,13 @@ fn main() -> anyhow::Result<()> {
         .n_sensor(n_gs)
         .lenslet_array(LensletArray::default().n_side_lenslet(48).n_px_lenslet(32));
     // .lenslet_flux(0.75);
-    let mut sh48_centroids: Centroids = Centroids::try_from(&sh48)?;
+    let mut sh48_centroids: CentroidsProcessing = CentroidsProcessing::try_from(&sh48)?;
 
     let gmt = Gmt::builder()
         .m1("bending modes", m1_n_mode)
         .m2("Karhunen-Loeve", m2_n_mode);
 
-    let mut optical_model = OpticalModel::<Camera<1>>::builder()
+    let optical_model = OpticalModel::<Camera<1>>::builder()
         .gmt(gmt.clone())
         .source(agws_gs.clone())
         .sensor(sh48);

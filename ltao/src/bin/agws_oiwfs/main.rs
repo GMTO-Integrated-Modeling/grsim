@@ -17,12 +17,9 @@ use gmt_dos_clients_crseo::{
         algebra::Collapse, Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
         ClosedLoopReconstructor, MirrorMode, Reconstructor,
     },
-    centroiding::ZeroMean,
-    sensors::{
-        builders::WaveSensorBuilder, Camera, DispersedFringeSensor,
-        DispersedFringeSensorProcessing, WaveSensor,
-    },
-    Centroids, DeviceInitialize, OpticalModel, OpticalModelBuilder,
+    centroiding::{CentroidsProcessing, ZeroMean},
+    sensors::{builders::WaveSensorBuilder, Camera, DispersedFringeSensor, WaveSensor},
+    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel, OpticalModelBuilder,
 };
 use gmt_dos_clients_io::{
     gmt_m1::{M1ModeShapes, M1RigidBodyMotions},
@@ -48,7 +45,7 @@ const M2_N_MODE: usize = 66;
 const OIWFS: usize = 1;
 const AGWS_N_GS: usize = 3;
 
-type LtwsCentroid = Centroids<ZeroMean>;
+type LtwsCentroid = CentroidsProcessing<ZeroMean>;
 const LTWS_1ST_MODE: usize = 2;
 
 const DFS_CAMERA_EXPOSURE: usize = 1;
@@ -89,14 +86,11 @@ async fn main() -> anyhow::Result<()> {
     let dfs_om_builder = OpticalModel::<DFS>::builder()
         .sampling_frequency(sampling_frequency)
         .gmt(gmt_builder.clone())
-        .source(agws_gs_builder.clone())
+        .source(agws_gs_builder.clone().band("J"))
         // .atmosphere(atm_builder)
-        .sensor(
-            DFS::builder()
-                .source(agws_gs_builder.clone())
-                .nyquist_factor(3.),
-        );
+        .sensor(DFS::builder().source(agws_gs_builder.clone().band("J")));
     let dfs_om = dfs_om_builder.clone().build()?;
+    println!("{dfs_om}");
 
     let offaxis_om: OpticalModel<WaveSensor> =
         OpticalModelBuilder::<WaveSensorBuilder>::from(&dfs_om_builder).build()?;
@@ -106,13 +100,24 @@ async fn main() -> anyhow::Result<()> {
     // AGWS SH48 ...
     let sh48 = Camera::builder()
         .n_sensor(AGWS_N_GS)
-        .lenslet_array(LensletArray::default().n_side_lenslet(48).n_px_lenslet(32))
+        .lenslet_array(
+            LensletArray::default()
+                .n_side_lenslet(48)
+                .n_px_lenslet(24)
+                .pitch(0.53),
+        )
+        .detector(Detector::default().n_px_framelet(8))
         .lenslet_flux(0.75);
-    let mut sh48_centroids: Centroids = Centroids::try_from(&sh48)?;
+    let mut sh48_centroids: CentroidsProcessing = CentroidsProcessing::try_from(&sh48)?;
 
     let sh48_om_builder = OpticalModel::<Camera<1>>::builder()
         .gmt(gmt_builder.clone())
-        .source(agws_gs_builder.clone())
+        .source(
+            agws_gs_builder
+                .pupil_size(48 as f64 * 0.53)
+                .band("R")
+                .fwhm(6.),
+        )
         .sensor(sh48);
     let mut file = File::create("src/bin/agws_oiwfs/sh48.ron")?;
     ron::ser::to_writer_pretty(&mut file, &sh48_om_builder, Default::default())?;
@@ -126,12 +131,13 @@ async fn main() -> anyhow::Result<()> {
         } else {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
-            let mut calib_sh48_bm = <Centroids as ClosedLoopCalibrate<WaveSensor>>::calibrate(
-                &sh48_om_builder.clone().into(),
-                CalibrationMode::modes(M1_N_MODE, 1e-4),
-                &closed_loop_optical_model,
-                CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
-            )?;
+            let mut calib_sh48_bm =
+                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                    &sh48_om_builder.clone().into(),
+                    CalibrationMode::modes(M1_N_MODE, 1e-4),
+                    &closed_loop_optical_model,
+                    CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
+                )?;
             calib_sh48_bm.pseudoinverse();
             serde_pickle::to_writer(
                 &mut File::create(format!("src/bin/agws_oiwfs/calib_sh48_{M1_N_MODE}bm.pkl"))?,
@@ -148,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
 
     // OIWFS TIP-TILT SENSOR ...
     let oiwfs = Camera::builder().detector(Detector::default().n_px_imagelet(512));
-    let mut oiwfs_centroids: Centroids = Centroids::try_from(&oiwfs)?;
+    let mut oiwfs_centroids: CentroidsProcessing = CentroidsProcessing::try_from(&oiwfs)?;
 
     let oiwfs_tt_om_builder = OpticalModel::<Camera<OIWFS>>::builder()
         .sampling_frequency(sampling_frequency)
@@ -160,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
         if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_oiwfs_tt.pkl") {
             serde_pickle::from_reader(file, Default::default())?
         } else {
-            let mut calib_oiwfs_tt = <Centroids as Calibrate<GmtM2>>::calibrate(
+            let mut calib_oiwfs_tt = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
                 &((&oiwfs_tt_om_builder).into()),
                 CalibrationMode::modes(M2_N_MODE, 1e-8) // .start_from(2)
                     .ends_at(3),
@@ -189,7 +195,7 @@ async fn main() -> anyhow::Result<()> {
         .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(32))
         // .detector(Detector::default().n_px_framelet(10))
         .lenslet_flux(0.75);
-    let mut ltws_centroids: LtwsCentroid = Centroids::try_from(&ltws)?;
+    let mut ltws_centroids: LtwsCentroid = CentroidsProcessing::try_from(&ltws)?;
 
     let ltws_om_builder = OpticalModel::<Camera<OIWFS>>::builder()
         .sampling_frequency(sampling_frequency)
@@ -229,7 +235,7 @@ async fn main() -> anyhow::Result<()> {
     let integrator = Integrator::new(M2_N_MODE * 7).gain(0.5);
     let adder = Operator::new("+");
 
-    let mut rng = WyRand::new();
+    /*     let mut rng = WyRand::new();
 
     let m1_rbm = (0..7).fold(Signals::new(42, 1000), |s, i| {
         s.channel(
@@ -248,8 +254,10 @@ async fn main() -> anyhow::Result<()> {
                 (2. * rng.generate::<f64>() - 1.) * 1e-4 / ((j + 1) as f64),
             )
         })
-    });
+    }); */
 
+    let m1_rbm = Signals::new(42, 1000).channel(6 * 0 + 3, 100f64.from_mas());
+    let m1_bm = Signals::new(M1_N_MODE * 7, 1000);
     // Signals::new(M1_N_MODE * 7, 1000).channel(0, 1e-4);
 
     // let to_nm = Gain::new(vec![1e9; 6]);
@@ -353,7 +361,7 @@ async fn main() -> anyhow::Result<()> {
     //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl");
     // let dfs_recon =
     //     DfsReconstructor::new("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-21bm.pkl");
-    let agws_recon = AgwsReconstructor::<Merged>::new()?;
+    let agws_recon = AgwsReconstructor::<Disjoined>::new(M1_N_MODE)?;
 
     let dfs_integrator = Integrator::new(42).gain(0.5);
     let sh48_integrator = Integrator::new(M1_N_MODE * 7).gain(0.5);

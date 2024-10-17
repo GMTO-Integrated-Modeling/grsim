@@ -2,19 +2,19 @@ use std::path::Path;
 
 use crseo::{gmt::GmtM2, imaging::Detector, FromBuilder, Gmt, Source};
 use gmt_dos_actors::actorscript;
-use gmt_dos_clients::{print::Print, Integrator, Signal, Signals, Timer};
+use gmt_dos_clients::{print::Print, Integrator, Signals};
 use gmt_dos_clients_crseo::{
     calibration::{Calibrate, CalibrationMode},
+    centroiding::CentroidsProcessing,
     sensors::Camera,
-    Centroids, DeviceInitialize, OpticalModel,
+    DeviceInitialize, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{Dev, Frame, WfeRms},
-    M12RigidBodyMotions,
 };
-use interface::{Tick, UID};
+use interface::UID;
 use skyangle::Conversion;
 
 const N_STEP: usize = 10;
@@ -39,15 +39,15 @@ async fn main() -> anyhow::Result<()> {
 
     // OIWFS TIP-TILT SENSOR ...
     let oiwfs = Camera::builder().detector(Detector::default().n_px_imagelet(256));
-    let mut oiwfs_centroids: Centroids = Centroids::try_from(&oiwfs)?;
+    let mut oiwfs_centroids: CentroidsProcessing = CentroidsProcessing::try_from(&oiwfs)?;
 
-    let mut oiwfs_tt_om_builder = OpticalModel::<Camera<OIWFS>>::builder()
+    let oiwfs_tt_om_builder = OpticalModel::<Camera<OIWFS>>::builder()
         .sampling_frequency(sampling_frequency)
         .gmt(gmt_builder.clone())
         .source(Source::builder().band("K"))
         .sensor(oiwfs);
 
-    let mut calib_oiwfs_tt = <Centroids as Calibrate<GmtM2>>::calibrate(
+    let mut calib_oiwfs_tt = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
         &((&oiwfs_tt_om_builder).into()),
         CalibrationMode::modes(M2_N_MODE, 1e-8)
             // .start_from(2)

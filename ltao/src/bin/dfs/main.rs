@@ -2,21 +2,19 @@ use std::fs::File;
 
 use crseo::{gmt::GmtM1, Atmosphere, FromBuilder, RayTracing, Source};
 use gmt_dos_actors::actorscript;
-use gmt_dos_clients::{print::Print, Gain, Sampler, Signal, Signals, Timer};
-use gmt_dos_clients_arrow::Arrow;
+use gmt_dos_clients::{print::Print, Gain, Signals};
 use gmt_dos_clients_crseo::{
     calibration::{algebra::Collapse, Calibrate, CalibrationMode},
-    sensors::{DispersedFringeSensor, DispersedFringeSensorProcessing},
-    DeviceInitialize, OpticalModel,
+    sensors::DispersedFringeSensor,
+    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
     optics::{
         dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
-        Dev, Frame, Host, SegmentPiston,
+        Dev, SegmentPiston,
     },
 };
-use interface::{Tick, Update, UID};
 use skyangle::Conversion;
 
 const DFS_CAMERA_EXPOSURE: usize = 10;
@@ -77,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
                 .source(src_builder.clone())
                 .nyquist_factor(3.),
         );
-    let mut om = om_builder.clone().build()?;
+    let om = om_builder.clone().build()?;
     let n = om.sensor().as_ref().unwrap().frame_size();
     let n_fft = om.sensor().as_ref().unwrap().fft_size();
     dbg!((n, n_fft));

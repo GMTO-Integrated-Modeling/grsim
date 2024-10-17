@@ -2,9 +2,12 @@ use std::fs::File;
 
 use crseo::{FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
-    calibration::{algebra::Collapse, Calib, CalibrationMode, ClosedLoopCalibrate, Reconstructor},
-    sensors::{DispersedFringeSensor, DispersedFringeSensorProcessing, NoSensor, WaveSensor},
-    DeviceInitialize, OpticalModel,
+    calibration::{
+        algebra::Collapse, CalibrationMode, ClosedLoopCalibrate, ClosedLoopReconstructor,
+        Reconstructor,
+    },
+    sensors::{DispersedFringeSensor, NoSensor, WaveSensor},
+    DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
 };
 use gmt_dos_clients_io::{
     gmt_m1::M1RigidBodyMotions,
@@ -14,7 +17,7 @@ use gmt_dos_clients_io::{
         Dev, WfeRms,
     },
 };
-use interface::{Read, Update, Write};
+use interface::{filing::Filing, Read, Update, Write};
 use skyangle::Conversion;
 
 type DFS = DispersedFringeSensor<1, 1>;
@@ -25,10 +28,10 @@ const M2_N_MODE: usize = 66;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let agws_gs_builder = Source::builder().size(3).on_ring(6f32.from_arcmin());
     let gmt_builder = Gmt::builder()
-        .m1("bending modes", 21)
+        // .m1("bending modes", 21)
         .m2("Karhunen-Loeve", M2_N_MODE);
 
-    let mut dfs_om_builder = OpticalModel::<DFS>::builder()
+    let dfs_om_builder = OpticalModel::<DFS>::builder()
         .gmt(gmt_builder.clone())
         .source(agws_gs_builder.clone())
         .sensor(
@@ -37,7 +40,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .nyquist_factor(3.),
         );
 
-    let mut recon =
+    let recon7 = Reconstructor::from_path_or_else(
+        "src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy7_v2.pkl",
+        || {
+            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+                &dfs_om_builder,
+                [CalibrationMode::RBM([
+                    None,                     // Tx
+                    None,                     // Ty
+                    None,                     // Tz
+                    Some(1f64.from_arcsec()), // Rx
+                    Some(1f64.from_arcsec()), // Ry
+                    None,                     // Rz
+                ]); 7],
+                // CalibrationMode::modes(21, 1e-6),
+                &OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone()),
+                CalibrationMode::modes(M2_N_MODE, 1e-6),
+            )
+            .unwrap()
+        },
+    )?;
+    println!("{recon7}");
+
+    /*     let mut recon =
         <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
             &dfs_om_builder,
             [CalibrationMode::RBM([
@@ -59,6 +84,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // &mut File::create("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-21bm.pkl")?,
         &recon,
         Default::default(),
+    )?; */
+
+    let recon: ClosedLoopReconstructor = serde_pickle::from_reader(
+        File::open("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl")?,
+        Default::default(),
     )?;
 
     let mut dfs_processor = DispersedFringeSensorProcessing::new();
@@ -68,20 +98,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{dfs_om}");
 
     let mut m1_rxy = vec![vec![0f64; 2]; 7];
-    m1_rxy[0][0] = 1f64.from_arcsec();
-    m1_rxy[1][1] = 1f64.from_arcsec();
-    let cmd: Vec<_> = recon
+    m1_rxy[0][0] = 100f64.from_mas();
+    // m1_rxy[1][1] = 1f64.from_arcsec();
+    let cmd: Vec<_> = recon7
         .calib_slice()
         .iter()
         .zip(&m1_rxy)
         .map(|(c, m1_rxy)| c.m1_to_m2() * -faer::mat::from_column_major_slice::<f64>(m1_rxy, 2, 1))
         .flat_map(|m| m.col_as_slice(0).to_vec())
-        .chain(vec![0.; M2_N_MODE])
+        // .chain(vec![0.; M2_N_MODE])
         .collect();
     println!("cmds: {:?}", cmd.len());
     // let q = &recon * vec![c];
 
-    let mut m1_rbm: Vec<f64> = m1_rxy
+    let m1_rbm: Vec<f64> = m1_rxy
         .into_iter()
         .flat_map(|rxy| {
             vec![0.; 3]
@@ -91,6 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .collect::<Vec<_>>()
         })
         .collect();
+    println!("rbm: {:?}", m1_rbm.len());
 
     let mut om = OpticalModel::<NoSensor>::builder()
         .gmt(gmt_builder.clone())
@@ -125,7 +156,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .col_as_slice(0)
         .chunks(2)
         .map(|rxy| rxy.iter().map(|x| x.to_mas()).collect::<Vec<_>>())
-        .for_each(|x| println!("{:+5.0?}", x));
+        .for_each(|x| println!("{:+5.0?} ({:5.0})", x, x[0].hypot(x[1])));
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn diff_mat() {
+        // let r0 = [1, -1, 0, 0, 0, 0, 0];
+        let rs: Vec<_> = (0..6)
+            .flat_map(|i| {
+                let mut r0 = vec![1., -1., 0., 0., 0., 0.];
+                r0.rotate_right(i);
+                r0.push(0.);
+                println!("{:?}", r0);
+                r0
+            })
+            .chain((0..6).flat_map(|i| {
+                let mut r0 = vec![0., 0., 0., 0., 0., 0., -1.];
+                r0[i] = 1.;
+                println!("{:?}", r0);
+                r0
+            }))
+            .collect();
+
+        let diff_mat = faer::mat::from_row_major_slice::<f64>(&rs, 12, 7);
+        println!("{:?}", diff_mat);
+        let svd = diff_mat.svd();
+        let s = svd.s_diagonal();
+        dbg!(&s);
+    }
 }

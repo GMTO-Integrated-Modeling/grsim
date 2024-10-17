@@ -668,13 +668,13 @@
     ),
     src: (
         size: 3,
-        pupil_size: 25.5,
+        pupil_size: 25.44,
         pupil_sampling: (
             type: "SquareGrid",
             size: Some(25.5),
             resolution: 512,
         ),
-        band: "V",
+        band: "R",
         zenith: [
             0.0017453294,
             0.0017453294,
@@ -691,7 +691,7 @@
             0.0,
         ],
         rays_coordinates: None,
-        fwhm: None,
+        fwhm: Some(6.0),
         rays_azimuth: None,
     ),
     atm_builder: None,
@@ -699,11 +699,11 @@
         n_sensor: 3,
         lenslet_array: (
             n_side_lenslet: 48,
-            n_px_lenslet: 32,
-            d: 0.53125,
+            n_px_lenslet: 24,
+            d: 0.53,
         ),
         detector: (
-            n_px_framelet: 32,
+            n_px_framelet: 8,
             n_px_imagelet: None,
             osf: 2,
             noise_specs: None,

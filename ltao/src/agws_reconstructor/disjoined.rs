@@ -16,7 +16,7 @@ impl AgwsReconstructor<Disjoined> {
             Default::default(),
         )?;
         let dfs_recon: ClosedLoopReconstructor = serde_pickle::from_reader(
-            File::open("src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy_v2.pkl")?,
+            File::open("src/bin/dfs_calibration_v3/recon_dfs_closed-loop_m1-rxy.pkl")?,
             Default::default(),
         )?;
         Ok(Self {
