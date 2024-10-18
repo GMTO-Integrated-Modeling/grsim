@@ -1,3 +1,4 @@
-export FEM_REPO=/Users/rromano/Workspace/gmt-data/20240408_1535_zen_30_M1_202110_FSM_202305_Mount_202305_IDOM_concreteAndFoundation_finalSI_largeMass/
+#export FEM_REPO=/Users/rromano/Workspace/gmt-data/20240408_1535_zen_30_M1_202110_FSM_202305_Mount_202305_IDOM_concreteAndFoundation_finalSI_largeMass/
+export FEM_REPO=/Users/rromano/Workspace/gmt-data/20240930_1845_zen_30_M1_202110_FSM_202305_Mount_202305_HP202409_largeMass/
 export FLOWCHART=sfdp
 export MOUNT_MODEL=MOUNT_FDR_1kHz

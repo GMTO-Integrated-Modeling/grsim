@@ -1,17 +1,17 @@
 //
-//
+// GRSIM script to simulate the effect of RLE ground accelerations
 //
 
 use gmt_dos_actors::actorscript;
-use gmt_dos_clients::{Signals, Source}; //Signal, 
+use gmt_dos_clients::Source; //{Signals, Signal, } 
 use gmt_dos_clients_fem::{DiscreteModalSolver, ExponentialMatrix};
 use gmt_dos_clients_io::{
     gmt_fem::{
         inputs::OSS00GroundAcc,
-        outputs::{OSSPayloads6D,OSSHardpointD,OSSM1Lcl},
+        outputs::{OSSPayloads6D,OSSHardpointD,OSSM1Lcl,Pier6D,OSS00Ground6D},//,OSSHardpointForce
     },
     gmt_m1::assembly,
-    mount::{MountEncoders, MountTorques, MountSetPoint,}, // 
+    mount::{MountEncoders, MountTorques, }, // MountSetPoint,
 };
 
 use gmt_dos_clients_m1_ctrl::{Calibration, M1};
@@ -35,46 +35,53 @@ async fn main() -> anyhow::Result<()> {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("data"),            
     );
 
-    // RLE data path
-    let sssha_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("data")
-        .join("RLE01_1kHz_dt.mat");
-    let acc_mat: na::DMatrix<f64> = MatFile::load(&sssha_path)?.var("RLE01_1kHz_dt")?;
-    let (sssha_length, n_sssha_dim) = acc_mat.shape();
-    dbg!(acc_mat.shape());
-
-
     let sim_sampling_frequency = 1000;
-    let n_step = sssha_length;//10000; //
-    let mut fem = Option::<FEM>::None;    
-    let m1_calibration = Calibration::new(fem.get_or_insert(FEM::from_env()?));
+    //let n_step = sssha_length;//10000; //
+    let mut fem = FEM::from_env()?;    
+    let m1_calibration = Calibration::new(&mut fem);
 
-    // FEM MODEL
-    let sids: Vec<u8> = vec![1, 2, 3, 4, 5, 6, 7];
-    let state_space =
-        DiscreteModalSolver::<ExponentialMatrix>::from_fem(fem.unwrap_or(FEM::from_env()?))
-            .sampling(sim_sampling_frequency as f64)
-            .proportional_damping(2. / 100.)
-            //.max_eigen_frequency(75f64)
-            .including_mount()
-            .including_m1(Some(sids.clone()))?
-            .ins::<OSS00GroundAcc>()
-            .outs::<OSSM1Lcl>()
-            .outs::<OSSPayloads6D>()
-            .outs::<OSSHardpointD>()       
-            .use_static_gain_compensation()
-            .build()?;
-    println!("{state_space}");
 
-    // FEM
-    let fem = state_space;
-    // MOUNT CONTROL
-    let mount = Mount::new();
-    // M1 control model
-    let m1 = M1::<ACTUATOR_RATE>::new(&m1_calibration)?;
 
-    // RLE-SSSHA DATA
-    let sssha_source = Source::new(acc_mat.transpose().as_slice().to_vec(), n_sssha_dim);
+    for id in 7..=7 {
+
+        dbg!(format!("RLE #{:02} dataset",id));
+        // RLE data path
+        let sssha_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("data")
+            .join(format!("RLE{:02}_1kHz_dt.mat",id));
+        let acc_mat: na::DMatrix<f64> = MatFile::load(&sssha_path)?.var(format!("RLE{:02}_1kHz_dt",id))?;
+        let (_sssha_length, n_sssha_dim) = acc_mat.shape();
+        dbg!(acc_mat.shape());
+
+        // DISCRETE STATE-SPACE MODEL (from FEM)
+        let sids: Vec<u8> = vec![1, 2, 3, 4, 5, 6, 7];
+        let state_space =
+            DiscreteModalSolver::<ExponentialMatrix>::from_fem(fem.clone())
+                .sampling(sim_sampling_frequency as f64)
+                .proportional_damping(2. / 100.)
+                // .max_eigen_frequency(95f64)
+                .including_mount()
+                .including_m1(Some(sids.clone()))?
+                .ins::<OSS00GroundAcc>()
+                .outs::<OSSM1Lcl>()
+                .outs::<Pier6D>()
+                .outs::<OSS00Ground6D>()
+                .outs::<OSSPayloads6D>()
+                .outs::<OSSHardpointD>()
+                // .outs::<OSSHardpointForce>()       
+                .use_static_gain_compensation()
+                .build()?;
+        println!("{state_space}");
+
+        // FEM
+        let fem = state_space;
+        // MOUNT CONTROL
+        let mount = Mount::new();
+        // M1 control model
+        let m1 = M1::<ACTUATOR_RATE>::new(&m1_calibration)?;
+
+        // RLE-SSSHA DATA
+        let sssha_source = Source::new(acc_mat.transpose().as_slice().to_vec(), n_sssha_dim);
     // let sssha_source = Signals::new(3, n_step)
     //     //.channel(0, Signal::Constant(5./100.))
     //     .channel(1, Signal::Sinusoid{
@@ -91,28 +98,31 @@ async fn main() -> anyhow::Result<()> {
     //     });
         
     // MOUNT SET-POINT
-    let setpoint = Signals::new(3, n_step);
+    // let setpoint = Signals::new(3, n_step);
     // M1 loop reference signals
     // let actuators = Signals::new(6 * 335 + 306, n_step);
     // let m1_rbm = Signals::new(6 * 7, n_step);
     
-    // DSL
-    actorscript! {
-    #[labels(fem = "Telescope\nStructure", mount = "Mount\nControl", sssha_source = "SSSHA Acc")]
-    1: sssha_source[OSS00GroundAcc] -> fem
-    // Mount control loop
-    1: setpoint[MountSetPoint] -> mount[MountTorques] -> fem[MountEncoders]! -> mount
-    //1: fem[MountEncoders]! -> mount[MountTorques] -> fem
-    // M1 SA Force loop      
-    1: fem[assembly::M1HardpointsMotion]! 
-        -> {m1}[assembly::M1ActuatorAppliedForces] -> fem    
-    // LOG
-    1: fem[OSSPayloads6D]${162}
-    //1: sssha_source[OSS00GroundAcc]${3}
-    1: fem[OSSHardpointD]${84}
-    1: fem[OSSM1Lcl]${42}
-    1: fem[MountEncoders]${14}
+        // DSL
+        actorscript! {
+        #[labels(fem = "Telescope\nStructure", mount = "Mount\nControl", sssha_source = "SSSHA Acc")]
+        1: sssha_source[OSS00GroundAcc] -> fem
+        // Mount control loop
+        //1: setpoint[MountSetPoint] -> mount[MountTorques] -> fem[MountEncoders]! -> mount
+        1: fem[MountEncoders]! -> mount[MountTorques] -> fem
+        // M1 SA Force loop      
+        1: fem[assembly::M1HardpointsMotion]! 
+            -> {m1}[assembly::M1ActuatorAppliedForces] -> fem    
+        // LOG
+        1: fem[OSSPayloads6D]${162}
+        1: sssha_source[OSS00GroundAcc]${3}
+        1: fem[Pier6D]${12}
+        1: fem[OSS00Ground6D]${6}
+        1: fem[OSSHardpointD]${84}
+        //1: fem[OSSHardpointForce]${42}
+        1: fem[OSSM1Lcl]${42}
+        1: fem[MountEncoders]${14}
+        }
     }
-
     Ok(())
 }
