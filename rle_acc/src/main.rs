@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
 
 
 
-    for id in 7..=7 {
+    for id in 4..=7 {
 
         dbg!(format!("RLE #{:02} dataset",id));
         // RLE data path
@@ -97,12 +97,7 @@ async fn main() -> anyhow::Result<()> {
     //         phase_s: 0.1f64
     //     });
         
-    // MOUNT SET-POINT
-    // let setpoint = Signals::new(3, n_step);
-    // M1 loop reference signals
-    // let actuators = Signals::new(6 * 335 + 306, n_step);
-    // let m1_rbm = Signals::new(6 * 7, n_step);
-    
+
         // DSL
         actorscript! {
         #[labels(fem = "Telescope\nStructure", mount = "Mount\nControl", sssha_source = "SSSHA Acc")]
@@ -123,6 +118,7 @@ async fn main() -> anyhow::Result<()> {
         1: fem[OSSM1Lcl]${42}
         1: fem[MountEncoders]${14}
         }
+        logging_1.lock().await.to_parquet(format!("model-20240408_1535-RLE{:02}_wiM1c_wiSGMC_1.parquet",id))?;
     }
     Ok(())
 }

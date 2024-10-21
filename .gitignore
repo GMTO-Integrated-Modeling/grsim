@@ -13,3 +13,4 @@ ngao/scopes/target/*
 ngao-opm/scopes/target/*
 rle_acc/data/RLE0*_1kHz_dt.mat
 rle_acc/data/*.zip
+rle_acc/*.eps
