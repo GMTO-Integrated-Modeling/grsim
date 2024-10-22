@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 use crseo::{gmt::GmtM1, imaging::LensletArray, FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
     calibration::{
-        algebra::{Block, CalibProps, Collapse}, Calibrate, CalibrationMode, ClosedLoopCalibrate,
+        algebra::{Block, CalibProps, Collapse}, Calibration, CalibrationMode, ClosedLoopCalibration,
         ClosedLoopReconstructor, MirrorMode, MixedMirrorMode, Reconstructor,
     },
     centroiding::CentroidsProcessing,
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
             let mut calib_sh48_bm =
-                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                <CentroidsProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate(
                     &((&sh48_om_builder).into()),
                     m1_bm.clone(),
                     &closed_loop_optical_model,
@@ -102,7 +102,7 @@ fn main() -> anyhow::Result<()> {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
             let mut calib_sh48_rbm =
-                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                <CentroidsProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate(
                     &((&sh48_om_builder).into()),
                     m1_rbm.clone(),
                     &closed_loop_optical_model,
@@ -125,7 +125,7 @@ fn main() -> anyhow::Result<()> {
     {
         serde_pickle::from_reader(file, Default::default())?
     } else {
-        let mut calib_sh48_tz = <CentroidsProcessing as Calibrate<GmtM1>>::calibrate(
+        let mut calib_sh48_tz = <CentroidsProcessing as Calibration<GmtM1>>::calibrate(
             &((&sh48_om_builder).into()),
             m1_tz.clone(),
         )?;
@@ -148,7 +148,7 @@ fn main() -> anyhow::Result<()> {
         serde_pickle::from_reader(file, Default::default())?
     } else {
         let mut calib_dfs_rbm =
-            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
                 &dfs_om_builder,
                 m1_rbm,
                 &OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone()),
@@ -170,7 +170,7 @@ fn main() -> anyhow::Result<()> {
         serde_pickle::from_reader(file, Default::default())?
     } else {
         let mut calib_dfs_tz =
-            <DispersedFringeSensorProcessing as Calibrate<GmtM1>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as Calibration<GmtM1>>::calibrate_serial(
                 &dfs_om_builder,
                 m1_tz,
             )?;
@@ -192,7 +192,7 @@ fn main() -> anyhow::Result<()> {
         serde_pickle::from_reader(file, Default::default())?
     } else {
         let mut calib_dfs_bm =
-            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
                 &dfs_om_builder,
                 m1_bm,
                 &OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone()),

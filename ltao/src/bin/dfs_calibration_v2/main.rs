@@ -3,7 +3,7 @@ use std::fs::File;
 use crseo::{FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
     calibration::{
-        algebra::Collapse, CalibrationMode, ClosedLoopCalibrate, ClosedLoopReconstructor,
+        algebra::Collapse, CalibrationMode, ClosedLoopCalibration, ClosedLoopReconstructor,
         Reconstructor,
     },
     sensors::{DispersedFringeSensor, NoSensor, WaveSensor},
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let recon7 = Reconstructor::from_path_or_else(
         "src/bin/dfs_calibration/calib_dfs_closed-loop_m1-rxy7_v2.pkl",
         || {
-            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
                 &dfs_om_builder,
                 [CalibrationMode::RBM([
                     None,                     // Tx
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{recon7}");
 
     /*     let mut recon =
-        <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+        <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
             &dfs_om_builder,
             [CalibrationMode::RBM([
                 None,                     // Tx

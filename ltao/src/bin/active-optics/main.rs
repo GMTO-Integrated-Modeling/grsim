@@ -8,7 +8,7 @@ use crseo::{
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signal, Signals, Timer};
 use gmt_dos_clients_crseo::{
-    calibration::{Calibrate, CalibrationMode, Reconstructor},
+    calibration::{Calibration, CalibrationMode, Reconstructor},
     centroiding::CentroidsProcessing,
     sensors::{
         builders::CameraBuilder,
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .sensor(imgr_builder);
 
     // Calibration of M2 Karhunen-Loeve modes
-    let mut calib_m2_modes = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
+    let mut calib_m2_modes = <CentroidsProcessing as Calibration<GmtM2>>::calibrate(
         &(&om_builder).into(),
         CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
     )?;

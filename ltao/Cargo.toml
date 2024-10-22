@@ -30,3 +30,7 @@ nanorand = "0.7.0"
 ron = "0.8.1"
 serde = "1.0.210"
 
+[dev-dependencies]
+colorous = "1.0.14"
+image = "0.25.4"
+

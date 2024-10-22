@@ -3,7 +3,7 @@ use std::fs::File;
 use crseo::{FromBuilder, Gmt, Source};
 use gmt_dos_clients_crseo::{
     calibration::{
-        algebra::{CalibProps, Collapse}, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
+        algebra::{CalibProps, Collapse}, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibration,
         Reconstructor,
     },
     sensors::{DispersedFringeSensor, NoSensor, SegmentPistonSensor, WaveSensor},
@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             serde_pickle::from_reader(&mut file, Default::default())?
         } else {
             println!("recon_closedloop_rxy_to_sp");
-            let recon = <SegmentPistonSensor as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+            let recon = <SegmentPistonSensor as ClosedLoopCalibration<WaveSensor>>::calibrate(
                 &sp_om_builder,
                 [CalibrationMode::RBM([
                     None,                    // Tx
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("calib_dfs_closed-loop_m1-rxy7");
         let recon =
-            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
                 &dfs_om_builder,
                 [CalibrationMode::RBM([
                     None,                    // Tx
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("recon_dfs_closed-loop_m1-rxy");
         let mut recon =
-            <DispersedFringeSensorProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate_serial(
+            <DispersedFringeSensorProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate_serial(
                 &dfs_om_builder,
                 [CalibrationMode::RBM([
                     None,                    // Tx

@@ -14,7 +14,7 @@ use gmt_dos_clients::{
 };
 use gmt_dos_clients_crseo::{
     calibration::{
-        algebra::Collapse, Calibrate, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibrate,
+        algebra::Collapse, Calibration, CalibrationMode, ClosedLoopCalib, ClosedLoopCalibration,
         ClosedLoopReconstructor, MirrorMode, Reconstructor,
     },
     centroiding::{CentroidsProcessing, ZeroMean},
@@ -132,7 +132,7 @@ async fn main() -> anyhow::Result<()> {
             let closed_loop_optical_model =
                 OpticalModel::<WaveSensor>::builder().gmt(gmt_builder.clone());
             let mut calib_sh48_bm =
-                <CentroidsProcessing as ClosedLoopCalibrate<WaveSensor>>::calibrate(
+                <CentroidsProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate(
                     &sh48_om_builder.clone().into(),
                     CalibrationMode::modes(M1_N_MODE, 1e-4),
                     &closed_loop_optical_model,
@@ -166,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
         if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_oiwfs_tt.pkl") {
             serde_pickle::from_reader(file, Default::default())?
         } else {
-            let mut calib_oiwfs_tt = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
+            let mut calib_oiwfs_tt = <CentroidsProcessing as Calibration<GmtM2>>::calibrate(
                 &((&oiwfs_tt_om_builder).into()),
                 CalibrationMode::modes(M2_N_MODE, 1e-8) // .start_from(2)
                     .ends_at(3),
@@ -207,7 +207,7 @@ async fn main() -> anyhow::Result<()> {
         if let Ok(file) = File::open("src/bin/agws_oiwfs/calib_m2_modes.pkl") {
             serde_pickle::from_reader(file, Default::default())?
         } else {
-            let mut calib_m2_modes = <LtwsCentroid as Calibrate<GmtM2>>::calibrate(
+            let mut calib_m2_modes = <LtwsCentroid as Calibration<GmtM2>>::calibrate(
                 &((&ltws_om_builder).into()),
                 CalibrationMode::modes(M2_N_MODE, 1e-7).start_from(LTWS_1ST_MODE),
             )?;
@@ -341,7 +341,7 @@ async fn main() -> anyhow::Result<()> {
     dfs_om_builder.initialize(&mut dfs_processor);
 
     // let (m1_to_m2, mut recon) =
-    //     <DispersedFringeSensorProcessing as ClosedLoopCalibrate>::calibrate(
+    //     <DispersedFringeSensorProcessing as ClosedLoopCalibration>::calibrate(
     //         dfs_om_builder.clone_into::<1, 1>(),
     //         CalibrationMode::RBM([
     //             None,                     // Tx

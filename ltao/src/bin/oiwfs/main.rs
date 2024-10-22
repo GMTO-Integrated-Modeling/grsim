@@ -4,7 +4,7 @@ use crseo::{gmt::GmtM2, imaging::Detector, FromBuilder, Gmt, Source};
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Integrator, Signals};
 use gmt_dos_clients_crseo::{
-    calibration::{Calibrate, CalibrationMode},
+    calibration::{Calibration, CalibrationMode},
     centroiding::CentroidsProcessing,
     sensors::Camera,
     DeviceInitialize, OpticalModel,
@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
         .source(Source::builder().band("K"))
         .sensor(oiwfs);
 
-    let mut calib_oiwfs_tt = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
+    let mut calib_oiwfs_tt = <CentroidsProcessing as Calibration<GmtM2>>::calibrate(
         &((&oiwfs_tt_om_builder).into()),
         CalibrationMode::modes(M2_N_MODE, 1e-8)
             // .start_from(2)

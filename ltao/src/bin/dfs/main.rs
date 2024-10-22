@@ -4,7 +4,7 @@ use crseo::{gmt::GmtM1, Atmosphere, FromBuilder, RayTracing, Source};
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{print::Print, Gain, Signals};
 use gmt_dos_clients_crseo::{
-    calibration::{algebra::Collapse, Calibrate, CalibrationMode},
+    calibration::{algebra::Collapse, Calibration, CalibrationMode},
     sensors::DispersedFringeSensor,
     DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel,
 };
@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let calib_m1_tz = if let Ok(file) = File::open("calib_m1_tz.pkl") {
         serde_pickle::from_reader(&file, Default::default()).unwrap()
     } else {
-        let mut calib_m1_tz = <DFSP11 as Calibrate<GmtM1>>::calibrate_serial(
+        let mut calib_m1_tz = <DFSP11 as Calibration<GmtM1>>::calibrate_serial(
             &OpticalModel::<DFS11>::builder()
                 .source(src_builder.clone())
                 .sensor(
