@@ -27,18 +27,18 @@ gmt_dos-clients_windloads = "2.2"
 crseo = "0.9"
 gmt-fem = "5.1.0"
 
-# DCMC DEBUG - LargeMass models
+# RLE simulations - LargeMass models
 [patch.crates-io]
-gmt_dos-actors = { path = "/Users/rromano/Workspace/dos-actors/actors" }
-gmt_dos-clients = { path = "/Users/rromano/Workspace/dos-actors/clients/core" }
-gmt_dos-actors-clients_interface = { path = "/Users/rromano/Workspace/dos-actors/interface" }
-gmt_dos-clients_io = { path = "/Users/rromano/Workspace/dos-actors/clients/io" }
-gmt_dos-clients_arrow = { path = "/Users/rromano/Workspace/dos-actors/clients/arrow" }
-#gmt_dos-clients_windloads = { path = "/Users/rromano/Workspace/dos-actors/clients/windloads" }
-gmt_dos-clients_fem = { path = "/Users/rromano/Workspace/dos-actors/clients/fem" }
-gmt-fem = { path = "/Users/rromano/Workspace/dos-actors/clients/fem/model" }
-gmt_dos-clients_m1-ctrl = { path = "/Users/rromano/Workspace/dos-actors/clients/m1-ctrl" }
-gmt_dos-clients_mount = { path = "/Users/rromano/Workspace/dos-actors/clients/mount" }
+gmt_dos-actors = { path = "/home/rromano/Workspace/dos-actors/actors" }
+gmt_dos-clients = { path = "/home/rromano/Workspace/dos-actors/clients/core" }
+gmt_dos-actors-clients_interface = { path = "/home/rromano/Workspace/dos-actors/interface" }
+gmt_dos-clients_io = { path = "/home/rromano/Workspace/dos-actors/clients/io" }
+gmt_dos-clients_arrow = { path = "/home/rromano/Workspace/dos-actors/clients/arrow" }
+#gmt_dos-clients_windloads = { path = "/home/rromano/Workspace/dos-actors/clients/windloads" }
+gmt_dos-clients_fem = { path = "/home/rromano/Workspace/dos-actors/clients/fem" }
+gmt-fem = { path = "/home/rromano/Workspace/dos-actors/clients/fem/model" }
+gmt_dos-clients_m1-ctrl = { path = "/home/rromano/Workspace/dos-actors/clients/m1-ctrl" }
+gmt_dos-clients_mount = { path = "/home/rromano/Workspace/dos-actors/clients/mount" }
 
 #[profile.release]
 #lto = "fat"
