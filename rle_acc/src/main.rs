@@ -81,21 +81,6 @@ async fn main() -> anyhow::Result<()> {
 
         // RLE-SSSHA DATA
         let sssha_source = Source::new(acc_mat.transpose().as_slice().to_vec(), n_sssha_dim);
-    // let sssha_source = Signals::new(3, n_step)
-    //     //.channel(0, Signal::Constant(5./100.))
-    //     .channel(1, Signal::Sinusoid{
-    //         amplitude: 25./100.,
-    //         sampling_frequency_hz: 1000f64,
-    //         frequency_hz: 4.0f64,
-    //         phase_s: 0f64
-    //     })
-    //     .channel(2, Signal::Sinusoid{
-    //         amplitude: 20./100.,
-    //         sampling_frequency_hz: 1000f64,
-    //         frequency_hz: 2.5f64,
-    //         phase_s: 0.1f64
-    //     });
-        
 
         // DSL
         actorscript! {
