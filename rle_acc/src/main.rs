@@ -41,8 +41,7 @@ async fn main() -> anyhow::Result<()> {
     let m1_calibration = Calibration::new(&mut fem);
 
 
-
-    for id in 4..=7 {
+    for id in 5..=7 {
 
         dbg!(format!("RLE #{:02} dataset",id));
         // RLE data path
@@ -118,7 +117,7 @@ async fn main() -> anyhow::Result<()> {
         1: fem[OSSM1Lcl]${42}
         1: fem[MountEncoders]${14}
         }
-        logging_1.lock().await.to_parquet(format!("model-20240408_1535-RLE{:02}_wiM1c_wiSGMC_1.parquet",id))?;
+        model_logging_1.lock().await.to_parquet(format!("model-20241021_1535-RLE{:02}_wiM1c_wiSGMC_1.parquet",id))?;
     }
     Ok(())
 }
