@@ -78,7 +78,7 @@ impl<const C: usize> Model for Sh48<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // use gmt_dos_clients::gif;
+    use gmt_dos_clients::gif;
     use gmt_dos_clients_io::optics::{Dev, Frame, Host, SensorData};
     use interface::{Read, Update, Write};
     use std::error::Error;

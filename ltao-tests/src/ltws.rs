@@ -66,3 +66,29 @@ impl Model for Ltws {
         Ok(calib_m2_modes)
     }
 }
+#[cfg(test)]
+mod tests {
+    use crate::Models;
+
+    use super::*;
+    use gmt_dos_clients::gif;
+    use gmt_dos_clients_io::optics::{Frame, Host};
+    use interface::{Read, Update, Write};
+    use std::error::Error;
+
+    #[test]
+    fn ltws() -> Result<(), Box<dyn Error>> {
+        let models = Models::new();
+        let mut ltws = models.ltws().build()?;
+        println!("{ltws}");
+        let mut frame = gif::Frame::<f32>::new("ltws.png", 60 * 32);
+        ltws.update();
+        <OpticalModel<_> as Write<Frame<Host>>>::write(&mut ltws).map(|data| {
+            dbg!(data.len());
+            <gif::Frame<_> as Read<Frame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+}

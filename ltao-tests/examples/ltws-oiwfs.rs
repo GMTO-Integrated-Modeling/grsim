@@ -1,3 +1,5 @@
+//! M1 Rxy estimation with both LTWS & OIWFS
+
 use std::{
     fs::{DirBuilder, File},
     path::Path,

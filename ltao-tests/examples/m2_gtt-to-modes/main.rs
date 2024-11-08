@@ -1,3 +1,5 @@
+//! # Projection of M2 global tip-tilt on M2 piston, tip and tilt KL modes
+
 use std::{fs::File, path::Path};
 
 use crseo::gmt::GmtM2;

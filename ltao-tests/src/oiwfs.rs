@@ -59,3 +59,29 @@ impl Model for Oiwfs {
         Ok(calib_oiwfs)
     }
 }
+#[cfg(test)]
+mod tests {
+    use crate::Models;
+
+    use super::*;
+    use gmt_dos_clients::gif;
+    use gmt_dos_clients_io::optics::{Frame, Host};
+    use interface::{Read, Update, Write};
+    use std::error::Error;
+
+    #[test]
+    fn oiwfs() -> Result<(), Box<dyn Error>> {
+        let models = Models::new();
+        let mut oiwfs = models.oiwfs().build()?;
+        println!("{oiwfs}");
+        let mut frame = gif::Frame::<f32, _>::new("oiwfs.png", 255).filter(|x| x.cbrt());
+        oiwfs.update();
+        <OpticalModel<_> as Write<Frame<Host>>>::write(&mut oiwfs).map(|data| {
+            dbg!(data.len());
+            <gif::Frame<_, _> as Read<Frame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+}

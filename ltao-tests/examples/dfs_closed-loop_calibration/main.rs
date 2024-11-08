@@ -1,7 +1,8 @@
 //! # DFS closed-loop calibration
 //!
 //! A calibration script for the DFS with 2 options:
-//!  1. closed-loop calibration of M1 segment tip-tilt
+//!  1. closed-loop calibration of M1 segment tip-tilt with both
+//! the LTWS and OIWFS loops closed
 //! ```
 //! cargo run -r --example dfs_closed-loop_calibration -- r_xyz
 //! ```

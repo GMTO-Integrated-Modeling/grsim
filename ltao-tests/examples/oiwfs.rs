@@ -1,3 +1,5 @@
+//! OIWFS & Global Tip-Tilt
+
 use crseo::{gmt::GmtM1, imaging::Detector, FromBuilder, Gmt, Source};
 use gmt_dos_clients::gif::Frame as Png;
 use gmt_dos_clients_crseo::{

@@ -188,3 +188,44 @@ impl<const C: usize, const F: usize> Model for Dfs<(), C, F> {
         unimplemented!()
     }
 }
+#[cfg(test)]
+mod tests {
+    use crate::Models;
+
+    use super::*;
+    use gmt_dos_clients::gif;
+    use gmt_dos_clients_io::optics::{dispersed_fringe_sensor::DfsFftFrame, Frame, Host};
+    use interface::{Read, Update, Write};
+    use std::error::Error;
+
+    #[test]
+    fn dfs() -> Result<(), Box<dyn Error>> {
+        let models = Models::new();
+        let mut dfs = models.dfs::<(), 1, 1>().build()?;
+        println!("{dfs}");
+        let mut frame = gif::Frame::<f32>::new("dfs.png", 258);
+        dfs.update();
+        <OpticalModel<_> as Write<Frame<Host>>>::write(&mut dfs).map(|data| {
+            dbg!(data.len());
+            <gif::Frame<_> as Read<Frame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+    #[test]
+    fn dfs_fft() -> Result<(), Box<dyn Error>> {
+        let models = Models::new();
+        let mut dfs = models.dfs::<(), 1, 1>().build()?;
+        println!("{dfs}");
+        let mut frame = gif::Frame::<f32>::new("dfs_fft.png", 516);
+        dfs.update();
+        <OpticalModel<_> as Write<DfsFftFrame<Host>>>::write(&mut dfs).map(|data| {
+            dbg!(data.len());
+            <gif::Frame<_> as Read<DfsFftFrame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+}
