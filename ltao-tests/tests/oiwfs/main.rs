@@ -11,7 +11,7 @@ use gmt_dos_clients_io::gmt_m1::M1RigidBodyMotions;
 use skyangle::Conversion;
 
 const M1_N_MODE: usize = 27;
-const M2_N_MODE: usize = 6;
+const M2_N_MODE: usize = 66;
 
 #[test]
 fn main() -> Result<(), Box<dyn Error>> {
@@ -29,8 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut recon: Reconstructor = <CentroidsProcessing as Calibrate<GmtM2>>::calibrate(
         &((&optical_model).into()),
-        CalibrationMode::modes(M2_N_MODE, 1e-8)
-            .start_from(2)
+        CalibrationMode::modes(M2_N_MODE, 1e-8) // .start_from(2)
             .ends_at(3),
     )?;
     recon.pseudoinverse();
@@ -41,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let estimate = <CentroidsProcessing as Estimation<M1RigidBodyMotions>>::estimate(
         &optical_model,
         &mut recon,
-        &data,
+        data,
     )?;
     dbg!(estimate.len());
     estimate

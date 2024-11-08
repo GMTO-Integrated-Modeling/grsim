@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, fs::File};
 
 use crseo::{FromBuilder, Gmt, Source};
 use gmt_dos_clients_io::{
@@ -146,15 +146,20 @@ fn calibrate_rxy_tz() -> Result<(), Box<dyn Error>> {
             // .remove(7),
             .update((7, CalibrationMode::empty_rbm())),
             &closed_loop_optical_model,
-            CalibrationMode::modes(m2_n_mode, 1e-6),
+            CalibrationMode::modes(m2_n_mode, 1e-6).start_from(2),
         )?;
     recon_rxy.pseudoinverse();
     println!("{recon_rxy}");
+    serde_pickle::to_writer(
+        &mut File::create("recon_rxy.pkl")?,
+        &recon_rxy.clone().collapse(),
+        Default::default(),
+    )?;
 
     let mut data = vec![0.; 42];
-    data[3] = 100f64.from_mas();
-    data[6 * 1 + 4] = 100f64.from_mas();
-    data[2] = 1e-6;
+    // data[3] = 100f64.from_mas();
+    // data[6 * 1 + 4] = 100f64.from_mas();
+    data[2] = 1000e-9;
     let estimate = <DispersedFringeSensorProcessing as ClosedLoopEstimation<
         WaveSensor,
         M1RigidBodyMotions,
@@ -181,20 +186,25 @@ fn calibrate_rxy_tz() -> Result<(), Box<dyn Error>> {
         MirrorMode::from(CalibrationMode::RBM([
             None,
             None,
-            Some(1e-6), // Txyz
+            Some(100e-9), // Txyz
             None,
             None,
             None, // Rxyz
         ]))
-        .remove(7), // .update((7, CalibrationMode::empty_rbm())),
+        .update((7, CalibrationMode::empty_rbm())),
     )?;
     recon_tz.pseudoinverse();
     println!("{recon_tz}");
+    serde_pickle::to_writer(
+        &mut File::create("recon_tz.pkl")?,
+        &recon_tz.clone().collapse(),
+        Default::default(),
+    )?;
 
-    let mut data = vec![0.; 42];
-    data[3] = 100f64.from_mas();
-    data[6 * 1 + 4] = 100f64.from_mas();
-    data[2] = 1e-6;
+    // let mut data = vec![0.; 42];
+    // data[3] = 100f64.from_mas();
+    // data[6 * 1 + 4] = 100f64.from_mas();
+    // data[2] = 1e-6;
     let estimate = <DispersedFringeSensorProcessing as Estimation<M1RigidBodyMotions>>::estimate(
         &optical_model,
         &mut recon_tz,
@@ -202,7 +212,7 @@ fn calibrate_rxy_tz() -> Result<(), Box<dyn Error>> {
     )?;
     estimate
         .chunks(6)
-        .map(|c| c.iter().map(|x| x * 1e6).collect::<Vec<_>>())
+        .map(|c| c.iter().map(|x| x * 1e9).collect::<Vec<_>>())
         .enumerate()
         .for_each(|(i, x)| println!("S{}: {:+6.0?}", i + 1, x));
 
@@ -222,17 +232,21 @@ fn calibrate_rxy_tz() -> Result<(), Box<dyn Error>> {
     let mut recon = recon.collapse();
     recon.pseudoinverse();
     println!("{recon}");
+    serde_pickle::to_writer(&mut File::create("recon.pkl")?, &recon, Default::default())?;
 
     let estimate = <DispersedFringeSensorProcessing as ClosedLoopEstimation<
         WaveSensor,
         M1RigidBodyMotions,
     >>::recon(&mut dfs_processor, &mut recon)?;
 
-    estimate
-        .chunks(6)
-        .map(|c| c.iter().map(|x| x.to_mas()).collect::<Vec<_>>())
-        .enumerate()
-        .for_each(|(i, x)| println!("S{}: {:+6.0?}", i + 1, x));
+    estimate.chunks(6).enumerate().for_each(|(i, x)| {
+        println!(
+            "S{}: {:+6.0?}{:+6.0?}",
+            i + 1,
+            x.iter().map(|x| x * 1e9).collect::<Vec<_>>(),
+            x.iter().map(|x| x.to_mas()).collect::<Vec<_>>()
+        )
+    });
 
     Ok(())
 }
