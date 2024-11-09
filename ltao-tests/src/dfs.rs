@@ -1,4 +1,9 @@
-use std::{fs::File, path::Path};
+use std::{
+    fs::File,
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+    path::Path,
+};
 
 use crseo::FromBuilder;
 use gmt_dos_clients_crseo::{
@@ -10,8 +15,31 @@ use gmt_dos_clients_crseo::{
     DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel, OpticalModelBuilder,
 };
 
-use crate::{Dfs, Model, Rxy, RxyPiston};
+use crate::{Model, Models};
 
+pub enum Rxy {}
+pub enum RxyPiston {}
+pub trait DfsModes {}
+impl DfsModes for Rxy {}
+impl DfsModes for RxyPiston {}
+impl DfsModes for () {}
+
+pub struct Dfs<M: DfsModes, const C: usize, const F: usize>(
+    pub(crate) Models,
+    pub(crate) PhantomData<M>,
+);
+impl<M: DfsModes, const C: usize, const F: usize> Deref for Dfs<M, C, F> {
+    type Target = Models;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<M: DfsModes, const C: usize, const F: usize> DerefMut for Dfs<M, C, F> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 impl<const C: usize, const F: usize> Model for Dfs<RxyPiston, C, F> {
     type Sensor = DispersedFringeSensor<C, F>;
     type Processor = DispersedFringeSensorProcessing;
@@ -22,9 +50,9 @@ impl<const C: usize, const F: usize> Model for Dfs<RxyPiston, C, F> {
             .source(self.agws_gss.clone())
             .sensor(DispersedFringeSensor::<C, F>::builder().source(self.agws_gss.clone()))
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     Ok(self.builder().build()?)
+    // }
     fn processor(&self) -> anyhow::Result<Self::Processor> {
         let mut processor = DispersedFringeSensorProcessing::new();
         self.builder().initialize(&mut processor);
@@ -99,9 +127,9 @@ impl<const C: usize, const F: usize> Model for Dfs<Rxy, C, F> {
             .source(self.agws_gss.clone())
             .sensor(DispersedFringeSensor::<C, F>::builder().source(self.agws_gss.clone()))
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     Ok(self.builder().build()?)
+    // }
     fn processor(&self) -> anyhow::Result<Self::Processor> {
         let mut processor = DispersedFringeSensorProcessing::new();
         self.builder().initialize(&mut processor);
@@ -176,9 +204,9 @@ impl<const C: usize, const F: usize> Model for Dfs<(), C, F> {
             .source(self.agws_gss.clone())
             .sensor(DispersedFringeSensor::<C, F>::builder().source(self.agws_gss.clone()))
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     Ok(self.builder().build()?)
+    // }
     fn processor(&self) -> anyhow::Result<Self::Processor> {
         let mut processor = DispersedFringeSensorProcessing::new();
         self.builder().initialize(&mut processor);

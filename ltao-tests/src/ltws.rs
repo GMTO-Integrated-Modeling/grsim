@@ -1,5 +1,8 @@
-use gmt_dos_clients_crseo::DeviceInitialize;
-use std::fs::File;
+use gmt_dos_clients_crseo::{sensors::builders::CameraBuilder, DeviceInitialize};
+use std::{
+    fs::File,
+    ops::{Deref, DerefMut},
+};
 
 use crseo::{gmt::GmtM2, imaging::LensletArray, FromBuilder, Source};
 use gmt_dos_clients_crseo::{
@@ -9,7 +12,30 @@ use gmt_dos_clients_crseo::{
     OpticalModel, OpticalModelBuilder,
 };
 
-use crate::{Ltws, Model, M2_N_MODE};
+use crate::{Model, Models, M2_N_MODE};
+
+pub struct Ltws(pub(crate) Models);
+impl Deref for Ltws {
+    type Target = Models;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Ltws {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Ltws {
+    pub fn ltws(&self) -> CameraBuilder {
+        Camera::<1>::builder()
+            .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(14))
+            // .detector(Detector::default().n_px_framelet(10))
+            .lenslet_flux(0.75)
+    }
+}
 
 impl Model for Ltws {
     type Sensor = Camera;
@@ -17,31 +43,23 @@ impl Model for Ltws {
     type Estimator = Reconstructor;
     fn processor(&self) -> anyhow::Result<Self::Processor> {
         // LTWS: wavefront sensor
-        let ltws = Camera::<1>::builder()
-            .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(32))
-            // .detector(Detector::default().n_px_framelet(10))
-            .lenslet_flux(0.75);
         // LTWS: centroids processing
-        let mut centroids = CentroidsProcessing::<ZeroMean>::try_from(&ltws)?;
+        let mut centroids = CentroidsProcessing::<ZeroMean>::try_from(&self.ltws())?;
         self.builder().initialize(&mut centroids);
         Ok(centroids)
     }
     fn builder(&self) -> OpticalModelBuilder<<Self::Sensor as FromBuilder>::ComponentBuilder> {
         // LTWS: wavefront sensor
-        let ltws = Camera::builder()
-            .lenslet_array(LensletArray::default().n_side_lenslet(60).n_px_lenslet(32))
-            // .detector(Detector::default().n_px_framelet(10))
-            .lenslet_flux(0.75);
         // LTWS: optical model
         OpticalModel::<Camera<1>>::builder()
             .gmt(self.gmt_builder.clone())
             .source(Source::builder().band("V"))
-            .sensor(ltws)
+            .sensor(self.ltws())
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        // LTWS: optical model
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     // LTWS: optical model
+    //     Ok(self.builder().build()?)
+    // }
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator> {
         // println!(" -- LTWS CALIBRATION -- ");
         let calib_file_name = format!("calib_ltws-{}_m2_modes.pkl", "full");
@@ -81,7 +99,7 @@ mod tests {
         let models = Models::new();
         let mut ltws = models.ltws().build()?;
         println!("{ltws}");
-        let mut frame = gif::Frame::<f32>::new("ltws.png", 60 * 32);
+        let mut frame = gif::Frame::<f32>::new("ltws.png", 60 * 14);
         ltws.update();
         <OpticalModel<_> as Write<Frame<Host>>>::write(&mut ltws).map(|data| {
             dbg!(data.len());

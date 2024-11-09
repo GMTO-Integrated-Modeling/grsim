@@ -6,9 +6,26 @@ use gmt_dos_clients_crseo::{
     DeviceInitialize, OpticalModel, OpticalModelBuilder,
 };
 use skyangle::Conversion;
-use std::fs::File;
+use std::{
+    fs::File,
+    ops::{Deref, DerefMut},
+};
 
-use crate::{Model, Oiwfs};
+use crate::{Model, Models};
+
+pub struct Oiwfs(pub(crate) Models);
+impl Deref for Oiwfs {
+    type Target = Models;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl DerefMut for Oiwfs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 impl Oiwfs {
     pub fn oiwfs() -> CameraBuilder {
         // OIWFS: imager
@@ -26,9 +43,9 @@ impl Model for Oiwfs {
             .source(Source::builder().band("K"))
             .sensor(Oiwfs::oiwfs())
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     Ok(self.builder().build()?)
+    // }
     fn processor(&self) -> anyhow::Result<Self::Processor> {
         // OIWFS: centroids processing
         let mut centroids = CentroidsProcessing::try_from(&Oiwfs::oiwfs())?;

@@ -3,7 +3,10 @@ use gmt_dos_clients_crseo::{
     sensors::{builders::CameraBuilder, WaveSensor},
     DeviceInitialize,
 };
-use std::fs::File;
+use std::{
+    fs::File,
+    ops::{Deref, DerefMut},
+};
 
 use crseo::{
     imaging::{Detector, LensletArray},
@@ -14,8 +17,21 @@ use gmt_dos_clients_crseo::{
     OpticalModelBuilder,
 };
 
-use crate::{Model, Models, Sh48, M1_N_MODE, M2_N_MODE};
+use crate::{Model, Models, M1_N_MODE, M2_N_MODE};
 
+pub struct Sh48<const C: usize>(pub(crate) Models);
+impl<const C: usize> Deref for Sh48<C> {
+    type Target = Models;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<const C: usize> DerefMut for Sh48<C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 impl<const C: usize> Sh48<C> {
     pub fn sh48(&self) -> CameraBuilder<C> {
         Camera::<C>::builder()
@@ -46,9 +62,9 @@ impl<const C: usize> Model for Sh48<C> {
             .source(self.agws_gss.clone())
             .sensor(self.sh48())
     }
-    fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
-        Ok(self.builder().build()?)
-    }
+    // fn build(&self) -> anyhow::Result<OpticalModel<Self::Sensor>> {
+    //     Ok(self.builder().build()?)
+    // }
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator> {
         let calib_sh48_bm: ClosedLoopReconstructor =
             if let Ok(file) = File::open(format!("calib_sh48_{M1_N_MODE}bm.pkl")) {
@@ -77,6 +93,7 @@ impl<const C: usize> Model for Sh48<C> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use gmt_dos_clients::gif;
     use gmt_dos_clients_io::optics::{Dev, Frame, Host, SensorData};
