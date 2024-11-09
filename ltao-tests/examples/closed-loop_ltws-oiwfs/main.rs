@@ -175,6 +175,7 @@ async fn main() -> anyhow::Result<()> {
                                 -> sh48
         10: sh48_m1_bm_int[M1ModeShapes] -> ltws
         10: sh48_m1_bm_int[M1ModeShapes] -> oiwfs
+        10: sh48_m1_bm_int[M1ModeShapes] -> dfs
         // DFS
         10: diff_m1_rbm[M1RigidBodyMotions]
             -> dfs[DfsFftFrame<Dev>]!
