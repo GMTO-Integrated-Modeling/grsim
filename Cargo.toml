@@ -1,5 +1,5 @@
 [workspace]
-members = ["open-loop", "ngao", "ngao-opm", "ltao", "ltao-tests"]
+members = ["open-loop", "ngao", "ngao-opm", "ltao"]
 resolver = "2"
 
 [workspace.package]

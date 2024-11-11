@@ -1,5 +1,5 @@
 [package]
-name = "grsim_ltao"
+name = "ltao"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -11,26 +11,16 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+crseo.workspace = true
+gmt_dos-clients = { workspace = true, features = ["gif", "nalgebra"] }
+gmt_dos-clients_crseo = { workspace = true, features = ["faer"] }
+gmt_dos-clients_io.workspace = true
+interface.workspace = true
+serde-pickle = "1.1.1"
+skyangle = "0.2.2"
+geotrans = {git = "https://github.com/rconan/geotrans.git", branch = "main"}
 tokio.workspace = true
 gmt_dos-actors.workspace = true
-gmt_dos-clients = { workspace = true, features = ["gif", "nalgebra"] }
-interface = { workspace = true, features = ["filing"] }
-gmt_dos-clients_io.workspace = true
 gmt_dos-clients_arrow.workspace = true
-gmt_dos-clients_crseo = { workspace = true }
-crseo.workspace = true
-gmt_dos-clients_scope = { workspace = true, features = ["server", "compress"] }
-skyangle = "0.2.2"
-complot = "0.3.4"
-serde-pickle = "1.1.1"
-gmt_dos-clients_servos = "2.1.0"
-gmt_dos-clients_windloads.workspace = true
-faer = "0.19.3"
-nanorand = "0.7.0"
-ron = "0.8.1"
-serde = "1.0.210"
-
-[dev-dependencies]
-colorous = "1.0.14"
-image = "0.25.4"
-
+faer = "0.19.4"
+serde = { version = "1.0.214", features = ["derive"] }

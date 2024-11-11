@@ -36,7 +36,7 @@ use gmt_dos_clients_io::{
     Estimate,
 };
 use interface::{Read, Update, Write};
-use ltao_tests::M2_N_MODE;
+use ltao::M2_N_MODE;
 use skyangle::Conversion;
 
 const M1_N_MODE: usize = 27;

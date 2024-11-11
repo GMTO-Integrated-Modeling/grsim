@@ -15,7 +15,7 @@ use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{Dev, Frame, M2GlobalTipTilt, SensorData, Wavefront, WfeRms},
 };
-use ltao_tests::{M2GttToPtt, Model, Models};
+use ltao::{M2GttToPtt, Model, Models};
 use skyangle::Conversion;
 
 const MIN_N_MODE: usize = 3;

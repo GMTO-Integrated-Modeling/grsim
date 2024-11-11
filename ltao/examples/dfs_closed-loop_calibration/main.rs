@@ -32,7 +32,7 @@ use gmt_dos_clients_io::{
         Dev, Frame, M2GlobalTipTilt, SensorData,
     },
 };
-use ltao_tests::{Model, Models, M2_N_MODE};
+use ltao::{Model, Models, M2_N_MODE};
 use skyangle::Conversion;
 
 // const N_STEP: usize = 25;

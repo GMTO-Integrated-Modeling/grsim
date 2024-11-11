@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 
     <OpticalModel<_> as Read<M1GlobalTipTilt>>::read(
         &mut oiwfs_tt_om,
-        [100f64.from_mas(), 100f64.from_mas()].into(),
+        vec![100f64.from_mas(), 100f64.from_mas()].into(),
     );
     oiwfs_tt_om.update();
 
