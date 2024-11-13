@@ -62,7 +62,7 @@ impl Model for Ltws {
     // }
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator> {
         // println!(" -- LTWS CALIBRATION -- ");
-        let calib_file_name = format!("calib_ltws-{}_m2_modes.pkl", "full");
+        let calib_file_name = format!("calib_ltws-full_m2_{M2_N_MODE}modes.pkl");
         let calib_m2_modes: Reconstructor = if let Ok(file) = File::open(&calib_file_name) {
             // println!("loading {calib_file_name}");
             serde_pickle::from_reader(file, Default::default())?

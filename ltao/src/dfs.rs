@@ -221,6 +221,7 @@ mod tests {
     use crate::Models;
 
     use super::*;
+    use crseo::{Atmosphere, RayTracing};
     use gmt_dos_clients::gif;
     use gmt_dos_clients_io::optics::{dispersed_fringe_sensor::DfsFftFrame, Frame, Host};
     use interface::{Read, Update, Write};
@@ -248,6 +249,59 @@ mod tests {
         println!("{dfs}");
         let mut frame = gif::Frame::<f32>::new("dfs_fft.png", 516);
         dfs.update();
+        <OpticalModel<_> as Write<DfsFftFrame<Host>>>::write(&mut dfs).map(|data| {
+            dbg!(data.len());
+            <gif::Frame<_> as Read<DfsFftFrame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+    #[test]
+    fn dfs_with_atmosphere() -> Result<(), Box<dyn Error>> {
+        let atm_builder = Atmosphere::builder()
+            .single_turbulence_layer(0f32, Some(7f32), Some(0f32))
+            .ray_tracing(
+                RayTracing::default()
+                    .duration(5.)
+                    .n_duration(100)
+                    .filepath("atm_single_layer.bin"),
+            );
+        let models = Models::new().atmosphere(500., atm_builder);
+        const R: usize = 5;
+        let mut dfs = models.dfs::<(), R, R>().build()?;
+        println!("{dfs}");
+        let mut frame = gif::Frame::<f32>::new("dfs_with_atmosphere.png", 258);
+        for _ in 0..R {
+            dfs.update();
+        }
+        <OpticalModel<_> as Write<Frame<Host>>>::write(&mut dfs).map(|data| {
+            // dbg!(data.len());
+            <gif::Frame<_> as Read<Frame<Host>>>::read(&mut frame, data)
+        });
+        frame.update();
+        frame.save()?;
+        Ok(())
+    }
+    #[test]
+    fn dfs_fft_with_atmosphere() -> Result<(), Box<dyn Error>> {
+        let atm_builder = Atmosphere::builder()
+            .single_turbulence_layer(0f32, Some(7f32), Some(0f32))
+            .ray_tracing(
+                RayTracing::default()
+                    .duration(5.)
+                    .n_duration(100)
+                    .filepath("atm_single_layer.bin"),
+            );
+        let models = Models::new().atmosphere(500., atm_builder);
+        const R: usize = 5;
+        const F: usize = 1000;
+        let mut dfs = models.dfs::<(), R, F>().build()?;
+        println!("{dfs}");
+        let mut frame = gif::Frame::<f32>::new("dfs_fft_with_atmosphere.png", 516);
+        for _ in 0..F * R {
+            dfs.update();
+        }
         <OpticalModel<_> as Write<DfsFftFrame<Host>>>::write(&mut dfs).map(|data| {
             dbg!(data.len());
             <gif::Frame<_> as Read<DfsFftFrame<Host>>>::read(&mut frame, data)

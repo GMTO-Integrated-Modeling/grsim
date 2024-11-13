@@ -1,10 +1,13 @@
 use std::{env, path::Path};
 
+use crseo::{Atmosphere, FromBuilder, RayTracing};
 use gmt_dos_actors::actorscript;
 use gmt_dos_clients::{
+    fun::Fun,
     gif,
     leftright::{Left as M1RBM, LeftRight, Right as M2modes, Split},
     print::Print,
+    select::Select,
     Integrator, Timer,
 };
 use gmt_dos_clients_crseo::{
@@ -16,16 +19,19 @@ use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{
         dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
-        Dev, Frame, M2GlobalTipTilt, SegmentPiston, SegmentWfeRms, SensorData, Wavefront, WfeRms,
+        Dev, Frame, Host, M2GlobalTipTilt, SegmentPiston, SegmentWfeRms, SensorData, Wavefront,
+        WfeRms,
     },
 };
 use interface::{Tick, UID};
 use ltao::{MergeAsmCommand, Model, Models, RxyPiston, M1_N_MODE, M2_N_MODE};
+use skyangle::Conversion;
 
 // const N_STEP: usize = 25;
 
-const C: usize = 10;
-const F: usize = 10;
+const DFS_CAM_INT: usize = 5;
+const DFS_FFT_INT: usize = 500;
+const SH48_INT: usize = 2500;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,7 +40,24 @@ async fn main() -> anyhow::Result<()> {
         .join("bin");
     env::set_var("DATA_REPO", &data_path);
 
-    let models = Models::new();
+    let sampling_frequency = 500f64;
+    // let atm_builder = Atmosphere::builder().ray_tracing(
+    //     RayTracing::default()
+    //         .field_size(10f64.from_arcmin())
+    //         .duration(60.)
+    //         .n_duration(15)
+    //         .filepath("ltao-atmosphere.bin"),
+    // );
+    let atm_builder = Atmosphere::builder()
+        .single_turbulence_layer(0f32, Some(7f32), Some(0f32))
+        .ray_tracing(
+            RayTracing::default()
+                .duration(5.)
+                .n_duration(100)
+                .filepath("atm_single_layer.bin"),
+        );
+
+    let models = Models::new().atmosphere(sampling_frequency, atm_builder);
 
     let ltws = models.ltws().build()?;
     println!("{ltws}");
@@ -48,27 +71,29 @@ async fn main() -> anyhow::Result<()> {
     let oiwfs_recon = models.oiwfs().reconstructor()?;
     let oiwfs_int = Integrator::new(2).gain(0.5);
 
-    let dfs = models.dfs::<RxyPiston, C, F>().build()?;
+    let dfs = models
+        .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
+        .build()?;
     println!("{dfs}");
-    let dfs_processor = models.dfs::<RxyPiston, C, F>().processor()?;
-    let dfs_recon = models.dfs::<RxyPiston, C, F>().reconstructor()?;
+    let dfs_processor = models
+        .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
+        .processor()?;
+    let dfs_recon = models
+        .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
+        .reconstructor()?;
 
-    let sh48 = models.sh48::<C>().build()?;
+    let sh48 = models.sh48::<SH48_INT>().build()?;
     println!("{sh48}");
-    let sh48_processor = models.sh48::<C>().processor()?;
+    let sh48_processor = models.sh48::<SH48_INT>().processor()?;
     println!("{:?}", sh48_processor.n_valid_lenslets());
-    let sh48_recon = models.sh48::<C>().reconstructor()?;
+    let sh48_recon = models.sh48::<SH48_INT>().reconstructor()?;
 
-    // let timer: Timer = Timer::new(1);
-    // // <OpticalModel<_> as interface::Update>::update(&mut sh48);
-    // actorscript!(
-    //     1:timer[Tick]
-    //         -> sh48[Frame<Dev>]!
-    //             -> sh48_processor[SensorData]${48*48*3*2}
-    // );
-    let offaxis_om: OpticalModel<WaveSensor> =
-        OpticalModelBuilder::<WaveSensorBuilder>::from(&models.dfs::<RxyPiston, C, F>().builder())
-            .build()?;
+    let offaxis_om: OpticalModel<WaveSensor> = OpticalModelBuilder::<WaveSensorBuilder>::from(
+        &models
+            .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
+            .builder(),
+    )
+    .build()?;
     println!("{offaxis_om}");
 
     // let cmd =
@@ -79,7 +104,7 @@ async fn main() -> anyhow::Result<()> {
 
     // let print = Print::default();
 
-    // let oiwfs_opd = gif::Frame::<f64>::new("oiwfs_opd.png", 512);
+    let oiwfs0_opd = gif::Gif::<f64>::new("oiwfs0_opd.gif", 512, 512)?;
 
     let add_m2_modes = MergeAsmCommand::new()?;
     // let t_xyz = Select::<f64>::new(0..3);
@@ -108,13 +133,15 @@ async fn main() -> anyhow::Result<()> {
                             -> add_m2_modes //oiwfs
         // 1: oiwfs_int[M2GlobalTipTilt] -> ltws
         // 1: ltws[WfeRms<-9>] -> print
-        1: oiwfs[WfeRms<-9>] -> print
-        1: oiwfs[SegmentWfeRms<-9>] -> print
-        1: oiwfs[SegmentPiston<-9>] -> print
+        1: oiwfs[WfeRms<-9>]$ -> print
+        1: oiwfs[SegmentWfeRms<-9>]$ -> print
+        1: oiwfs[SegmentPiston<-9>]$ -> print
+        1: oiwfs[Wavefront]$ -> oiwfs0_opd
     );
+    // oiwfs_opd.lock().await.save()?;
 
     let dfs_m1_rbm_int = Integrator::new(42).gain(0.1);
-    let dfs_m2_bm_int = Integrator::new(M2_N_MODE * 7).gain(0.1);
+    let dfs_m2_bm_int = Integrator::new(7).gain(0.1);
     // let diff_m1_rbm = Operator::new("+");
     // let add_m2_modes = Operator::new("+");
     let add_m2_modes = MergeAsmCommand::new()?;
@@ -123,14 +150,14 @@ async fn main() -> anyhow::Result<()> {
 
     let split_m12_rbm = LeftRight::<M1RbmM2modes, Split, M1RbmM2modes>::split_at(42);
 
-    // let idx: Vec<_> = (0..7)
-    // .flat_map(|i| (3..5).map(|j| i * 6 + j).collect::<Vec<_>>())
-    // .collect();
-    // let r_xyz = Select::<f64>::new(idx);
-    // let to_mas = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x.to_mas()).collect::<Vec<_>>());
+    let idx: Vec<_> = (0..7)
+        .flat_map(|i| (3..5).map(|j| i * 6 + j).collect::<Vec<_>>())
+        .collect();
+    let r_xyz = Select::<f64>::new(idx);
+    let to_mas = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x.to_mas()).collect::<Vec<_>>());
     // let idx: Vec<_> = (0..7).map(|i| i * M2_N_MODE).collect();
     // let t_z = Select::<f64>::new(idx);
-    // let to_nm = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x * 1e9).collect::<Vec<_>>());
+    let to_nm = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x * 1e9).collect::<Vec<_>>());
 
     let sh48_m1_bm_int = Integrator::new(M1_N_MODE * 7).gain(0.1);
 
@@ -140,13 +167,13 @@ async fn main() -> anyhow::Result<()> {
     let dfs_print = Print::default();
     let dfs_opd = gif::Frame::<f64>::new("dfs_opd.png", 512);
     let oiwfs_opd = gif::Frame::<f64>::new("oiwfs_opd.png", 512);
+    // let sh48_frame = gif::Gif::<f32>::new("sh48_frame.gif", 48 * 8 * 3, 48 * 8)?;
     // let dfs_opd = gif::Gif::<f64>::new("dfs_opd.png", 512);
-    let timer: Timer = Timer::new(200);
+    let timer: Timer = Timer::new(SH48_INT * 10);
     actorscript!(
         #[model(name=ltws_oiwfs_dfs)]
-        #[labels(ltws="LTWS",oiwfs="OIWFS",
-            sh48="SH48",dfs="DFS",
-            dfs_opd="DFS\nOPD",oiwfs_opd="OIWFS\nOPD")]
+        #[labels(ltws="GMT w/\n🌫  & LTWS",oiwfs="GMT w/\n🌫  & OIWFS",
+            sh48="GMT w/\n🌫  & SH48",dfs="GMT w/\n🌫  & DFS")]
             // to_mas="To MAS",to_nm="To NM")]
         // LTWS
         // 1: m1_rbm[Left<M1RigidBodyMotions>]
@@ -172,10 +199,11 @@ async fn main() -> anyhow::Result<()> {
         // SH48
         // 10: diff_m1_rbm[M1RigidBodyMotions]//${42}
             // -> sh48[Frame<Dev>]!
-        10: sh48[Frame<Dev>]!
+        2500: sh48[Frame<Dev>]!
                 -> sh48_processor[SensorData]//${48*48*3*2}
                     -> sh48_recon[M1ModeShapes]
                             -> sh48_m1_bm_int
+        // 1: sh48[Frame<Host>] -> sh48_frame
         1: sh48_m1_bm_int[M1ModeShapes]//${M1_N_MODE*7}
                                 -> sh48
         1: sh48_m1_bm_int[M1ModeShapes] -> dfs
@@ -184,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
         // DFS
         // 10: diff_m1_rbm[M1RigidBodyMotions]
         //     -> dfs[DfsFftFrame<Dev>]!
-        10: dfs[DfsFftFrame<Dev>]!
+        2500: dfs[DfsFftFrame<Dev>]!
                 -> dfs_processor[Intercepts]//${36}
                     -> dfs_recon[M1RbmM2modes]
                         -> split_m12_rbm[M1RBM<M1RbmM2modes>]
@@ -194,34 +222,42 @@ async fn main() -> anyhow::Result<()> {
         1: dfs_m1_rbm_int[M1RigidBodyMotions] -> sh48
         1: dfs_m1_rbm_int[M1RigidBodyMotions] -> ltws
         1: dfs_m1_rbm_int[M1RigidBodyMotions] -> oiwfs
-        10: split_m12_rbm[M2modes<M1RbmM2modes>]
-            -> dfs_m2_bm_int[SegmentPiston]
+        2500: split_m12_rbm[M2modes<M1RbmM2modes>]
+            -> dfs_m2_bm_int
+        1: dfs_m2_bm_int[SegmentPiston]
                 -> add_m2_modes
-        // 10: split_m12_rbm[M1RBM<M1RbmM2modes>]
+        // 2500: split_m12_rbm[M1RBM<M1RbmM2modes>]
         //     -> r_xyz[M1Rxy]
-        //         -> to_mas[M1Rxy]
-        //             -> dfs_print
-        // 10: split_m12_rbm[M2modes<M1RbmM2modes>]
-        //     -> t_z[M2Piston]
-        //         -> to_nm[M2Piston]
-        //             -> dfs_print
+        //         -> to_mas[M1Rxy]${14}
+        //             // -> dfs_print
+        // 2500: split_m12_rbm[M2modes<M1RbmM2modes>]
+        //     // -> t_z[M2Piston]
+        //         -> to_nm[M2Piston]${7}
+        //             // -> dfs_print
 
         // 10: ltws[WfeRms<-9>] -> dfs_print
+        1: oiwfs[WfeRms<-9>]$
+        1: oiwfs[SegmentWfeRms<-9>]$
+        1: oiwfs[SegmentPiston<-9>]$
         10: oiwfs[WfeRms<-9>] -> dfs_print
         10: oiwfs[SegmentWfeRms<-9>] -> dfs_print
         10: oiwfs[SegmentPiston<-9>] -> dfs_print
 
         // 20: diff_m1_rbm[M1RigidBodyMotions] -> offaxis_om
-        20: dfs_m1_rbm_int[M1RigidBodyMotions] -> offaxis_om
-        20: sh48_m1_bm_int[M1ModeShapes] -> offaxis_om
-        20: add_m2_modes[M2ASMAsmCommand] -> offaxis_om
+        // 20: dfs_m1_rbm_int[M1RigidBodyMotions] -> offaxis_om
+        // 20: sh48_m1_bm_int[M1ModeShapes] -> offaxis_om
+        // 20: add_m2_modes[M2ASMAsmCommand] -> offaxis_om
         // 20: oiwfs_int[M2GlobalTipTilt] -> offaxis_om
-        20: offaxis_om[Wavefront] -> dfs_opd
-        20: oiwfs[Wavefront] -> oiwfs_opd
+        // 20: offaxis_om[Wavefront] -> dfs_opd
+        // 1-1: oiwfs[Wavefront]$// -> oiwfs_opd
+        1: dfs_m1_rbm_int[M1RigidBodyMotions]${42}
+        1: dfs_m2_bm_int[SegmentPiston]${7}
+        1: sh48_m1_bm_int[M1ModeShapes]${M1_N_MODE*7}
+        1: add_m2_modes[M2ASMAsmCommand]${M2_N_MODE *7}
     );
 
-    oiwfs_opd.lock().await.save()?;
-    dfs_opd.lock().await.save()?;
+    // oiwfs_opd.lock().await.save()?;
+    // dfs_opd.lock().await.save()?;
 
     Ok(())
 }

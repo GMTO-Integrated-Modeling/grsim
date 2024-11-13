@@ -157,11 +157,10 @@ async fn main() -> anyhow::Result<()> {
             let mut recon = <DispersedFringeSensorProcessing as Calibration<GmtM2>>::calibrate(
                 &models.dfs::<(), 1, 1>().builder(),
                 MirrorMode::from(
-                    CalibrationMode::modes(M2_N_MODE, stroke)
-                        .start_from(1)
-                        .ends_at(1),
+                    CalibrationMode::modes(1, stroke), // .start_from(1)
+                                                       // .ends_at(1),
                 )
-                .update((7, CalibrationMode::empty_modes(M2_N_MODE))),
+                .update((7, CalibrationMode::empty_modes(1))),
             )?;
             recon.pseudoinverse();
             println!("{recon}");

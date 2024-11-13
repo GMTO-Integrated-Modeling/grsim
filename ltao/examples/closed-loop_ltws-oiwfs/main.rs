@@ -29,10 +29,11 @@ use skyangle::Conversion;
 // const N_STEP: usize = 25;
 
 const C: usize = 10;
-const F: usize = 10;
+const F: usize = 1;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let data_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("examples")
         .join("closed-loop_ltws-oiwfs");
@@ -57,7 +58,7 @@ async fn main() -> anyhow::Result<()> {
     let dfs_processor = models.dfs::<RxyPiston, C, F>().processor()?;
     let dfs_recon = models.dfs::<RxyPiston, C, F>().reconstructor()?;
 
-    let mut sh48 = models.sh48::<C>().build()?;
+    let sh48 = models.sh48::<C>().fwhm(6.).build()?;
     println!("{sh48}");
     let sh48_processor = models.sh48::<C>().processor()?;
     println!("{:?}", sh48_processor.n_valid_lenslets());
@@ -75,10 +76,10 @@ async fn main() -> anyhow::Result<()> {
             .build()?;
     println!("{offaxis_om}");
 
-    let cmd =
-        geotrans::Mirror::<geotrans::M1>::tiptilt_2_rigidbodymotions((50f64.from_mas(), 0f64));
-    // let mut cmd = vec![0f64; 42];
-    // cmd[3] = 250f64.from_mas();
+    // let cmd =
+    // geotrans::Mirror::<geotrans::M1>::tiptilt_2_rigidbodymotions((50f64.from_mas(), 0f64));
+    let mut cmd = vec![0f64; 42];
+    cmd[3] = 250f64.from_mas();
     let m1_rbm = Signals::from((cmd.clone(), 20));
 
     // let print = Print::default();
@@ -116,8 +117,9 @@ async fn main() -> anyhow::Result<()> {
         1: oiwfs[SegmentPiston<-9>] -> print
     );
 
-    let dfs_m1_rbm_int = Integrator::new(42).gain(0.1);
-    let dfs_m2_bm_int = Integrator::new(M2_N_MODE * 7).gain(0.1);
+    let agws_gain = 0.1;
+    let dfs_m1_rbm_int = Integrator::new(42).gain(agws_gain);
+    let dfs_m2_bm_int = Integrator::new(7).gain(agws_gain);
     let diff_m1_rbm = Operator::new("+");
     // let add_m2_modes = Operator::new("+");
     let add_m2_modes = MergeAsmCommand::new()?;
@@ -135,7 +137,7 @@ async fn main() -> anyhow::Result<()> {
     let t_z = Select::<f64>::new(idx);
     let to_nm = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x * 1e9).collect::<Vec<_>>());
 
-    let sh48_m1_bm_int = Integrator::new(M1_N_MODE * 7).gain(0.1);
+    let sh48_m1_bm_int = Integrator::new(M1_N_MODE * 7).gain(agws_gain);
 
     // let print = Print::default();
     let dfs_print = Print::default();
@@ -144,9 +146,9 @@ async fn main() -> anyhow::Result<()> {
     // let dfs_opd = gif::Gif::<f64>::new("dfs_opd.png", 512);
     actorscript!(
         #[model(name=ltws_oiwfs_dfs)]
-        #[labels(ltws="LTWS",oiwfs="OIWFS",
-            sh48="SH48",dfs="DFS",
-            to_mas="To MAS",to_nm="To NM")]
+        // #[labels(ltws="LTWS",oiwfs="OIWFS",
+            // sh48="SH48",dfs="DFS",
+            // to_mas="To MAS",to_nm="To NM")]
         // LTWS
         1: m1_rbm[Left<M1RigidBodyMotions>]
         -> diff_m1_rbm[M1RigidBodyMotions]
@@ -171,32 +173,35 @@ async fn main() -> anyhow::Result<()> {
             -> sh48[Frame<Dev>]!
                 -> sh48_processor[SensorData]//${48*48*3*2}
                     -> sh48_recon[M1ModeShapes]
-                            -> sh48_m1_bm_int[M1ModeShapes]${M1_N_MODE*7}
+                            -> sh48_m1_bm_int
+        1: sh48_m1_bm_int[M1ModeShapes]${M1_N_MODE*7}
                                 -> sh48
-        10: sh48_m1_bm_int[M1ModeShapes] -> ltws
-        10: sh48_m1_bm_int[M1ModeShapes] -> oiwfs
-        10: sh48_m1_bm_int[M1ModeShapes] -> dfs
+        1: sh48_m1_bm_int[M1ModeShapes] -> ltws
+        1: sh48_m1_bm_int[M1ModeShapes] -> oiwfs
+        1: sh48_m1_bm_int[M1ModeShapes] -> dfs
         // DFS
         10: diff_m1_rbm[M1RigidBodyMotions]
             -> dfs[DfsFftFrame<Dev>]!
                 -> dfs_processor[Intercepts]//${36}
                     -> dfs_recon[M1RbmM2modes]
                         -> split_m12_rbm[M1RBM<M1RbmM2modes>]
-                            -> dfs_m1_rbm_int[Right<M1RigidBodyMotions>]
+                            -> dfs_m1_rbm_int
+        1: dfs_m1_rbm_int[Right<M1RigidBodyMotions>]
                                 -> diff_m1_rbm
         10: split_m12_rbm[M2modes<M1RbmM2modes>]
-            -> dfs_m2_bm_int[SegmentPiston]
+            -> dfs_m2_bm_int
+        1: dfs_m2_bm_int[SegmentPiston]
                 -> add_m2_modes
         10: split_m12_rbm[M1RBM<M1RbmM2modes>]
             -> r_xyz[M1Rxy]
                 -> to_mas[M1Rxy]
                     -> dfs_print
         10: split_m12_rbm[M2modes<M1RbmM2modes>]
-            -> t_z[M2Piston]
+            // -> t_z[M2Piston]
                 -> to_nm[M2Piston]
                     -> dfs_print
 
-        // 10: ltws[WfeRms<-9>] -> dfs_print
+        // // 10: ltws[WfeRms<-9>] -> dfs_print
         10: oiwfs[WfeRms<-9>] -> dfs_print
         10: oiwfs[SegmentWfeRms<-9>] -> dfs_print
         10: oiwfs[SegmentPiston<-9>] -> dfs_print
@@ -204,7 +209,7 @@ async fn main() -> anyhow::Result<()> {
         20: diff_m1_rbm[M1RigidBodyMotions] -> offaxis_om
         20: sh48_m1_bm_int[M1ModeShapes] -> offaxis_om
         20: add_m2_modes[M2ASMAsmCommand] -> offaxis_om
-        // 20: oiwfs_int[M2GlobalTipTilt] -> offaxis_om
+        20: oiwfs_int[M2GlobalTipTilt] -> offaxis_om
         20: offaxis_om[Wavefront] -> dfs_opd
         20: oiwfs[Wavefront] -> oiwfs_opd
 
@@ -214,8 +219,8 @@ async fn main() -> anyhow::Result<()> {
 
     );
 
-    oiwfs_opd.lock().await.save()?;
-    dfs_opd.lock().await.save()?;
+    // oiwfs_opd.lock().await.save()?;
+    // dfs_opd.lock().await.save()?;
 
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ops::Deref};
 
 use crseo::{
     atmosphere::AtmosphereBuilder, gmt::GmtBuilder, source::SourceBuilder, FromBuilder, Gmt, Source,
@@ -10,11 +10,12 @@ use gmt_dos_clients_crseo::{
 use skyangle::Conversion;
 
 pub const M1_N_MODE: usize = 27;
-pub const M2_N_MODE: usize = 66;
+pub const M2_N_MODE: usize = 200;
 const AGWS_N_GS: usize = 3;
 
 pub trait Model: ModelBuilder
 where
+    Self: Deref<Target = Models>,
     OpticalModelBuilder<<Self::Sensor as FromBuilder>::ComponentBuilder>:
         DeviceInitialize<Self::Processor>,
 {
@@ -24,8 +25,8 @@ where
     fn processor(&self) -> anyhow::Result<Self::Processor>;
     fn builder(&self) -> OpticalModelBuilder<<Self::Sensor as FromBuilder>::ComponentBuilder>;
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator>;
-    fn atmosphere(&self) -> Option<AtmosphereBuilder> {
-        None
+    fn atmosphere(&self) -> Option<(f64, AtmosphereBuilder)> {
+        <Self as Deref>::deref(self).atm_builder.clone()
     }
     fn build(&self) -> anyhow::Result<
         OpticalModel<
@@ -66,12 +67,16 @@ where
     >
     {
         // Ok(self.builder().build()?)
-        Ok(if let Some(atmosphere) = <T as Model>::atmosphere(self) {
-            <T as Model>::builder(self).atmosphere(atmosphere)
-        } else {
-            <T as Model>::builder(self)
-        }
-        .build()?)
+        Ok(
+            if let Some((sampling_frequency, atmosphere)) = <T as Model>::atmosphere(self) {
+                <T as Model>::builder(self)
+                    .sampling_frequency(sampling_frequency)
+                    .atmosphere(atmosphere)
+            } else {
+                <T as Model>::builder(self)
+            }
+            .build()?,
+        )
     }
 }
 
@@ -79,7 +84,7 @@ where
 pub struct Models {
     pub gmt_builder: GmtBuilder,
     pub agws_gss: SourceBuilder,
-    pub atm_builder: Option<AtmosphereBuilder>,
+    pub atm_builder: Option<(f64, AtmosphereBuilder)>,
 }
 
 impl Models {
@@ -92,11 +97,11 @@ impl Models {
             agws_gss: Source::builder()
                 .size(AGWS_N_GS)
                 .on_ring(6f32.from_arcmin()),
-            atm_builder: None,
+            ..Default::default()
         }
     }
-    pub fn atmosphere(mut self, atm: AtmosphereBuilder) -> Self {
-        self.atm_builder = Some(atm);
+    pub fn atmosphere(mut self, sampling_frequency: f64, atm: AtmosphereBuilder) -> Self {
+        self.atm_builder = Some((sampling_frequency, atm));
         self
     }
     pub fn gmt(&self) -> GmtBuilder {
@@ -107,12 +112,8 @@ impl Models {
     }
     pub fn sh48<const C: usize>(&self) -> Sh48<C> {
         Sh48(Self {
-            agws_gss: self
-                .agws_gss
-                .clone()
-                .pupil_size(48 as f64 * 0.53)
-                .band("R")
-                .fwhm(6.),
+            agws_gss: self.agws_gss.clone().pupil_size(48_f64 * 0.53).band("R"),
+            // .fwhm(6.),
             ..self.clone()
         })
     }

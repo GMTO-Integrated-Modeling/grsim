@@ -44,14 +44,15 @@ impl Update for MergeAsmCommand {
                 });
         }
         if let Some(piston) = self.piston.as_ref() {
+            // self.modes
+            //     .chunks_mut(M2_N_MODE)
+            //     .zip(piston.chunks(M2_N_MODE))
+            //     .for_each(|(m, p)| m.iter_mut().zip(p).for_each(|(m, p)| *m += *p));
             self.modes
                 .chunks_mut(M2_N_MODE)
-                .zip(piston.chunks(M2_N_MODE))
-                .for_each(|(m, p)| m.iter_mut().zip(p).for_each(|(m, p)| *m += *p));
-        } // self.modes
-          //     .chunks_mut(M2_N_MODE)
-          //     .zip(self.piston.iter())
-          //     .for_each(|(m, p)| m[0] += *p);
+                .zip(piston.iter())
+                .for_each(|(m, p)| m[0] += *p);
+        }
     }
 }
 impl Read<SegmentPiston> for MergeAsmCommand {
