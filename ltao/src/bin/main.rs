@@ -59,18 +59,37 @@ async fn main() -> anyhow::Result<()> {
 
     let models = Models::new().atmosphere(sampling_frequency, atm_builder);
 
+    println!(
+        r#"
+------
+ LTWS
+------"#
+    );
     let ltws = models.ltws().build()?;
     println!("{ltws}");
     let ltws_processor = models.ltws().processor()?;
     let ltws_recon = models.ltws().reconstructor()?;
+    println!("{ltws_recon}");
     let ltws_int = Integrator::new(M2_N_MODE * 7).gain(0.5);
 
+    println!(
+        r#"
+-------
+ OIWFS
+-------"#
+    );
     let oiwfs = models.oiwfs().build()?;
     println!("{oiwfs}");
     let oiwfs_processor = models.oiwfs().processor()?;
     let oiwfs_recon = models.oiwfs().reconstructor()?;
     let oiwfs_int = Integrator::new(2).gain(0.5);
 
+    println!(
+        r#"
+-----
+ DFS
+-----"#
+    );
     let dfs = models
         .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
         .build()?;
@@ -81,12 +100,23 @@ async fn main() -> anyhow::Result<()> {
     let dfs_recon = models
         .dfs::<RxyPiston, DFS_CAM_INT, DFS_FFT_INT>()
         .reconstructor()?;
+    println!("{dfs_recon}");
+    let dfs_m1_rbm_int = Integrator::new(42).gain(0.1);
+    let dfs_m2_bm_int = Integrator::new(7).gain(0.1);
 
+    println!(
+        r#"
+------
+ SH48
+------"#
+    );
     let sh48 = models.sh48::<SH48_INT>().build()?;
     println!("{sh48}");
     let sh48_processor = models.sh48::<SH48_INT>().processor()?;
     println!("{:?}", sh48_processor.n_valid_lenslets());
     let sh48_recon = models.sh48::<SH48_INT>().reconstructor()?;
+    println!("{sh48_recon}");
+    let sh48_m1_bm_int = Integrator::new(M1_N_MODE * 7).gain(0.1);
 
     let offaxis_om: OpticalModel<WaveSensor> = OpticalModelBuilder::<WaveSensorBuilder>::from(
         &models
@@ -140,8 +170,6 @@ async fn main() -> anyhow::Result<()> {
     );
     // oiwfs_opd.lock().await.save()?;
 
-    let dfs_m1_rbm_int = Integrator::new(42).gain(0.1);
-    let dfs_m2_bm_int = Integrator::new(7).gain(0.1);
     // let diff_m1_rbm = Operator::new("+");
     // let add_m2_modes = Operator::new("+");
     let add_m2_modes = MergeAsmCommand::new()?;
@@ -158,8 +186,6 @@ async fn main() -> anyhow::Result<()> {
     // let idx: Vec<_> = (0..7).map(|i| i * M2_N_MODE).collect();
     // let t_z = Select::<f64>::new(idx);
     let to_nm = Fun::new(|x: &Vec<f64>| x.iter().map(|x| x * 1e9).collect::<Vec<_>>());
-
-    let sh48_m1_bm_int = Integrator::new(M1_N_MODE * 7).gain(0.1);
 
     // let sh48_sampler = Sampler::default();
 
