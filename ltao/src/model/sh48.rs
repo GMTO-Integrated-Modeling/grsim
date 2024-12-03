@@ -3,6 +3,10 @@ use gmt_dos_clients_crseo::{
     sensors::{builders::CameraBuilder, WaveSensor},
     DeviceInitialize,
 };
+use gmt_dos_clients_io::{
+    gmt_m1::M1ModeShapes,
+    optics::{Dev, Frame, SensorData},
+};
 use std::{
     fs::File,
     ops::{Deref, DerefMut},
@@ -17,7 +21,7 @@ use gmt_dos_clients_crseo::{
     OpticalModelBuilder,
 };
 
-use crate::{Model, Models, M1_N_MODE, M2_N_MODE};
+use crate::{kernels::KernelSpecs, Model, Models, M1_N_MODE, M2_N_MODE};
 
 pub struct Sh48<const C: usize>(pub(crate) Models);
 impl<const C: usize> Deref for Sh48<C> {
@@ -31,6 +35,12 @@ impl<const C: usize> DerefMut for Sh48<C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+impl<const C: usize> KernelSpecs for Sh48<C> {
+    type Integrator = gmt_dos_clients::Integrator<M1ModeShapes>;
+    type Input = Frame<Dev>;
+    type Data = SensorData;
+    type Output = M1ModeShapes;
 }
 impl<const C: usize> Sh48<C> {
     pub fn sh48(&self) -> CameraBuilder<C> {

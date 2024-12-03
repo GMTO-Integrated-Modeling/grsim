@@ -14,8 +14,12 @@ use gmt_dos_clients_crseo::{
     sensors::DispersedFringeSensor,
     DeviceInitialize, DispersedFringeSensorProcessing, OpticalModel, OpticalModelBuilder,
 };
+use gmt_dos_clients_io::optics::{
+    dispersed_fringe_sensor::{DfsFftFrame, Intercepts},
+    Dev,
+};
 
-use crate::{Model, Models};
+use crate::{kernels::KernelSpecs, M1RbmM2modes, Model, Models};
 
 pub enum Rxy {}
 pub enum RxyPiston {}
@@ -39,6 +43,12 @@ impl<M: DfsModes, const C: usize, const F: usize> DerefMut for Dfs<M, C, F> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+impl<M: DfsModes, const F: usize, const C: usize> KernelSpecs for Dfs<M, C, F> {
+    type Integrator = gmt_dos_clients::Integrator<M1RbmM2modes>;
+    type Input = DfsFftFrame<Dev>;
+    type Data = Intercepts;
+    type Output = M1RbmM2modes;
 }
 impl<const C: usize, const F: usize> Model for Dfs<RxyPiston, C, F> {
     type Sensor = DispersedFringeSensor<C, F>;

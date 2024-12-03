@@ -5,13 +5,14 @@ use gmt_dos_clients_crseo::{
     sensors::{builders::CameraBuilder, Camera},
     DeviceInitialize, OpticalModel, OpticalModelBuilder,
 };
+use gmt_dos_clients_io::optics::{Dev, Frame, M2GlobalTipTilt};
 use skyangle::Conversion;
 use std::{
     fs::File,
     ops::{Deref, DerefMut},
 };
 
-use crate::{Model, Models};
+use crate::{kernels::KernelSpecs, Model, Models};
 
 pub struct Oiwfs(pub(crate) Models);
 impl Deref for Oiwfs {
@@ -25,6 +26,12 @@ impl DerefMut for Oiwfs {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+impl KernelSpecs for Oiwfs {
+    type Integrator = gmt_dos_clients::Integrator<M2GlobalTipTilt>;
+    type Input = Frame<Dev>;
+    type Data = M2GlobalTipTilt;
+    type Output = M2GlobalTipTilt;
 }
 impl Oiwfs {
     pub fn oiwfs() -> CameraBuilder {

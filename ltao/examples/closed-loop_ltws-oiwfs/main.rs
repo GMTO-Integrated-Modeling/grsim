@@ -79,7 +79,7 @@ async fn main() -> anyhow::Result<()> {
     // let cmd =
     // geotrans::Mirror::<geotrans::M1>::tiptilt_2_rigidbodymotions((50f64.from_mas(), 0f64));
     let mut cmd = vec![0f64; 42];
-    cmd[3] = 250f64.from_mas();
+    cmd[2] = 250f64.from_mas();
     let m1_rbm = Signals::from((cmd.clone(), 20));
 
     // let print = Print::default();

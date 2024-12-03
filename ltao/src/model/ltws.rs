@@ -1,4 +1,8 @@
 use gmt_dos_clients_crseo::{sensors::builders::CameraBuilder, DeviceInitialize};
+use gmt_dos_clients_io::{
+    gmt_m2::asm::M2ASMAsmCommand,
+    optics::{Dev, Frame, SensorData},
+};
 use std::{
     fs::File,
     ops::{Deref, DerefMut},
@@ -12,7 +16,7 @@ use gmt_dos_clients_crseo::{
     OpticalModel, OpticalModelBuilder,
 };
 
-use crate::{Model, Models, M2_N_MODE};
+use crate::{kernels::KernelSpecs, Model, Models, M2_N_MODE};
 
 pub struct Ltws(pub(crate) Models);
 impl Deref for Ltws {
@@ -26,6 +30,13 @@ impl DerefMut for Ltws {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+
+impl KernelSpecs for Ltws {
+    type Integrator = gmt_dos_clients::Integrator<M2ASMAsmCommand>;
+    type Input = Frame<Dev>;
+    type Data = SensorData;
+    type Output = M2ASMAsmCommand;
 }
 
 impl Ltws {

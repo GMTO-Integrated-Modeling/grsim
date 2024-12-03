@@ -1,5 +1,5 @@
 [workspace]
-members = ["open-loop", "ngao", "ngao-opm", "ltao"]
+members = ["open-loop", "ngao", "ngao-opm", "ltao", "ltao/eigen-modes"]
 resolver = "2"
 
 [workspace.package]
@@ -39,4 +39,7 @@ gmt_dos-clients_io = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors
 gmt_dos-clients_windloads = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/windloads" }
 gmt_dos-clients_scope = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/scope" }
 gmt_dos-clients_arrow = { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/arrow" }
+gmt_dos-clients_fem= { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/fem" }
+gmt_dos-clients_m1-ctrl= { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/m1-ctrl" }
+gmt-fem= { path = "/home/ubuntu/data/home/ubuntu/projects/dos-actors/clients/fem/model" }
 crseo = {path = "/home/ubuntu/projects/crseo"}
