@@ -68,11 +68,31 @@ where
     }
 }
 
-impl<T> Read<<T as KernelSpecs>::Input> for Kernel<T>
+// impl<T> Read<<T as KernelSpecs>::Input> for Kernel<T>
+// where
+//     T: Model + KernelSpecs + Deref<Target = Models>,
+//     OpticalModelBuilder<<T::Sensor as FromBuilder>::ComponentBuilder>:
+//         DeviceInitialize<T::Processor>,
+//     <T as KernelSpecs>::Input: UniqueIdentifier,
+//     <T as Model>::Processor: Read<<T as KernelSpecs>::Input>,
+//     <T as KernelSpecs>::Data: UniqueIdentifier,
+//     <T as Model>::Processor: Write<<T as KernelSpecs>::Data>,
+//     <T as Model>::Estimator: Read<<T as KernelSpecs>::Data>,
+//     <T as KernelSpecs>::Output: UniqueIdentifier,
+//     <T as Model>::Estimator: Write<<T as KernelSpecs>::Output>,
+//     <T as KernelSpecs>::Integrator: Read<<T as KernelSpecs>::Output>,
+// {
+//     fn read(&mut self, data: Data<<T as KernelSpecs>::Input>) {
+//         <<T as Model>::Processor as Read<_>>::read(&mut self.processor, data);
+//     }
+// }
+impl<T> Read<KernelFrame<T>> for Kernel<T>
 where
     T: Model + KernelSpecs + Deref<Target = Models>,
     OpticalModelBuilder<<T::Sensor as FromBuilder>::ComponentBuilder>:
         DeviceInitialize<T::Processor>,
+    KernelFrame<T>:
+        UniqueIdentifier<DataType = <<T as KernelSpecs>::Input as UniqueIdentifier>::DataType>,
     <T as KernelSpecs>::Input: UniqueIdentifier,
     <T as Model>::Processor: Read<<T as KernelSpecs>::Input>,
     <T as KernelSpecs>::Data: UniqueIdentifier,
@@ -82,8 +102,11 @@ where
     <T as Model>::Estimator: Write<<T as KernelSpecs>::Output>,
     <T as KernelSpecs>::Integrator: Read<<T as KernelSpecs>::Output>,
 {
-    fn read(&mut self, data: Data<<T as KernelSpecs>::Input>) {
-        <<T as Model>::Processor as Read<_>>::read(&mut self.processor, data);
+    fn read(&mut self, data: Data<KernelFrame<T>>) {
+        <<T as Model>::Processor as Read<<T as KernelSpecs>::Input>>::read(
+            &mut self.processor,
+            data.transmute::<<T as KernelSpecs>::Input>(),
+        );
     }
 }
 impl<T> Update for Kernel<T>

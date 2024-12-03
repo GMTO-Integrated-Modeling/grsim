@@ -15,13 +15,13 @@ use gmt_dos_clients_crseo::{
 use gmt_dos_clients_io::{
     gmt_m1::{M1ModeShapes, M1RigidBodyMotions},
     gmt_m2::asm::M2ASMAsmCommand,
-    optics::{
-        dispersed_fringe_sensor::DfsFftFrame, Dev, Frame, M2GlobalTipTilt, SegmentPiston,
-        SegmentWfeRms, Wavefront, WfeRms,
-    },
+    optics::{M2GlobalTipTilt, SegmentPiston, SegmentWfeRms, Wavefront, WfeRms},
 };
 use interface::{Data, Read, Tick, Update, Write, UID};
-use ltao::{M1RbmM2modes, MergeAsmCommand, Model, Models, RxyPiston, M1_N_MODE, M2_N_MODE};
+use ltao::{
+    kernels::KernelFrame, Dfs, Ltws, M1RbmM2modes, MergeAsmCommand, Model, Models, Oiwfs,
+    RxyPiston, Sh48, M1_N_MODE, M2_N_MODE,
+};
 
 // const N_STEP: usize = 25;
 
@@ -131,7 +131,7 @@ async fn main() -> anyhow::Result<()> {
         // LTWS
         // 1: m1_rbm[M1RigidBodyMotions]
         1: timer[Tick]
-            -> ltws[Frame<Dev>]!
+            -> ltws[KernelFrame<Ltws>]!
                 // -> ltws_processor[SensorData]
                     // -> ltws_recon[M2ASMAsmCommand]
                         -> ltws_kernel[M2ASMAsmCommand]
@@ -141,7 +141,7 @@ async fn main() -> anyhow::Result<()> {
         // OIWFS
         // 1: m1_rbm[M1RigidBodyMotions]
             // -> oiwfs[Frame<Dev>]!
-        1: oiwfs[Frame<Dev>]!
+        1: oiwfs[KernelFrame<Oiwfs>]!
                 // -> oiwfs_processor[SensorData]
                     // -> oiwfs_recon[M2GlobalTipTilt]
                         -> oiwfs_kernel[M2GlobalTipTilt]
@@ -190,7 +190,7 @@ async fn main() -> anyhow::Result<()> {
         // 1: m1_rbm[Left<M1RigidBodyMotions>]
         // -> diff_m1_rbm[M1RigidBodyMotions]
         1: timer[Tick]
-            -> ltws[Frame<Dev>]!
+            -> ltws[KernelFrame<Ltws>]!
                 // -> ltws_processor[SensorData]
                     // -> ltws_recon[M2ASMAsmCommand]
                         -> ltws_kernel[M2ASMAsmCommand]
@@ -202,7 +202,7 @@ async fn main() -> anyhow::Result<()> {
         // OIWFS
         // 1: diff_m1_rbm[M1RigidBodyMotions]
             // -> oiwfs[Frame<Dev>]!
-        1: oiwfs[Frame<Dev>]!
+        1: oiwfs[KernelFrame<Oiwfs>]!
                 // -> oiwfs_processor[M2GlobalTipTilt]
                     // -> oiwfs_recon[M2GlobalTipTilt]
                         -> oiwfs_kernel[M2GlobalTipTilt]
@@ -210,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
         // SH48
         // 10: diff_m1_rbm[M1RigidBodyMotions]//${42}
             // -> sh48[Frame<Dev>]!
-        2500: sh48[Frame<Dev>]!
+        2500: sh48[KernelFrame<Sh48<SH48_INT>>]!
                 // -> sh48_processor[SensorData]//${48*48*3*2}
                     // -> sh48_recon[M1ModeShapes]
                             -> sh48_kernel
@@ -223,7 +223,7 @@ async fn main() -> anyhow::Result<()> {
         // DFS
         // 10: diff_m1_rbm[M1RigidBodyMotions]
         //     -> dfs[DfsFftFrame<Dev>]!
-        2500: dfs[DfsFftFrame<Dev>]!
+        2500: dfs[KernelFrame<Dfs<RxyPiston,DFS_CAM_INT,DFS_FFT_INT>>]!
                 // -> dfs_processor[Intercepts]//${36}
                     // -> dfs_recon[M1RbmM2modes]
                             -> dfs_kernel[M1RbmM2modes]
