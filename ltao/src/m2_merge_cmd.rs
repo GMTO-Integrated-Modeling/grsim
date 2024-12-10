@@ -2,11 +2,11 @@ use std::{fs::File, path::Path, sync::Arc};
 
 use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
-    optics::{M2GlobalTipTilt, SegmentPiston},
+    optics::{M2GlobalTipTilt, M2modes, SegmentPiston},
 };
 use interface::{Data, Read, Update, Write};
 
-use crate::{M2GttToPtt, M2_N_MODE};
+use crate::{m2_parameters::M2_N_MODE, M2GttToPtt};
 
 #[derive(Debug, Default, Clone)]
 pub struct MergeAsmCommand {
@@ -35,7 +35,7 @@ impl MergeAsmCommand {
 impl Update for MergeAsmCommand {
     fn update(&mut self) {
         if let Some(gtt) = self.global_tiptilt.as_ref() {
-            let ptt = self.gtt_to_ptt.transfrom(gtt);
+            let ptt = self.gtt_to_ptt.transform(gtt);
             self.modes
                 .chunks_mut(M2_N_MODE)
                 .zip(ptt.chunks(ptt.len() / 7))
@@ -72,6 +72,11 @@ impl Read<M2GlobalTipTilt> for MergeAsmCommand {
 }
 impl Write<M2ASMAsmCommand> for MergeAsmCommand {
     fn write(&mut self) -> Option<Data<M2ASMAsmCommand>> {
+        Some(self.modes.clone().into())
+    }
+}
+impl Write<M2modes> for MergeAsmCommand {
+    fn write(&mut self) -> Option<Data<M2modes>> {
         Some(self.modes.clone().into())
     }
 }

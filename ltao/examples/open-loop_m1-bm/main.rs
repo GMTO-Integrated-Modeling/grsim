@@ -20,7 +20,10 @@ use gmt_dos_clients_io::{
 use gmt_dos_clients_mount::Mount;
 // use gmt_fem::FEM;
 use gmt_dos_clients_fem::fem_io::actors_outputs::OSSM1Lcl;
-use ltao::{M1BendingModes, ModalToZonal, M1_N_MODE, N_ACTUATOR};
+use ltao::{
+    m2_parameters::{ASM_N_ACTUATOR, M1_N_MODE},
+    M1BendingModes, ModalToZonal,
+};
 
 const N_STEP: usize = 16000;
 const ACTUATOR_RATE: usize = 80;
@@ -53,7 +56,7 @@ async fn main() -> anyhow::Result<()> {
     // let gmt = Gmt::builder().m2("Karhunen-Loeve", M2_N_MODE);
     let gmt = Gmt::builder()
         .m1("m1_bm_gmt-fem", M1_N_MODE)
-        .m2("asms_ifs_gmt-fem", N_ACTUATOR);
+        .m2("asms_ifs_gmt-fem", ASM_N_ACTUATOR);
 
     // let atm_builder = Atmosphere::builder()
     //     .single_turbulence_layer(0f32, Some(7f32), Some(0f32))

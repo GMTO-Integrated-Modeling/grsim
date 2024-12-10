@@ -21,7 +21,12 @@ use gmt_dos_clients_crseo::{
     OpticalModelBuilder,
 };
 
-use crate::{kernels::KernelSpecs, Model, Models, M1_N_MODE, M2_N_MODE};
+use crate::{
+    kernels::KernelSpecs,
+    m1_parameters::{BENDING_MODES, M1_N_MODE},
+    m2_parameters::{ASMS_MODES, M2_N_MODE},
+    Model, Models,
+};
 
 pub struct Sh48<const C: usize>(pub(crate) Models);
 impl<const C: usize> Deref for Sh48<C> {
@@ -82,27 +87,42 @@ impl<const C: usize> Model for Sh48<C> {
     //     Ok(self.builder().build()?)
     // }
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator> {
-        let calib_sh48_bm: ClosedLoopReconstructor =
-            if let Ok(file) = File::open(format!("calib_sh48_{M1_N_MODE}bm.pkl")) {
-                serde_pickle::from_reader(file, Default::default())?
-            } else {
-                let closed_loop_optical_model =
-                    OpticalModel::<WaveSensor>::builder().gmt(self.gmt_builder.clone());
-                let mut calib_sh48_bm =
-                    <CentroidsProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate(
-                        &self.builder().source(self.agws_gss.clone().fwhm(6.)).into(),
-                        CalibrationMode::modes(M1_N_MODE, 1e-4),
-                        &closed_loop_optical_model,
-                        CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
-                    )?;
-                calib_sh48_bm.pseudoinverse();
-                serde_pickle::to_writer(
-                    &mut File::create(format!("calib_sh48_{M1_N_MODE}bm.pkl"))?,
-                    &calib_sh48_bm,
-                    Default::default(),
+        let calib_file_name = format!("calib_sh48_{M1_N_MODE}{BENDING_MODES}.pkl");
+        let calib_sh48_bm: ClosedLoopReconstructor = if let Ok(file) = File::open(&calib_file_name)
+        {
+            serde_pickle::from_reader(file, Default::default())?
+        } else {
+            let closed_loop_optical_model = OpticalModel::<WaveSensor>::builder().gmt(
+                self.gmt_builder
+                    .clone()
+                    .m1(BENDING_MODES, M1_N_MODE)
+                    .m2(ASMS_MODES, M2_N_MODE),
+            );
+
+            let mut calib_sh48_bm =
+                <CentroidsProcessing as ClosedLoopCalibration<WaveSensor>>::calibrate(
+                    &self
+                        .builder()
+                        .gmt(
+                            self.gmt_builder
+                                .clone()
+                                .m1(BENDING_MODES, M1_N_MODE)
+                                .m2(ASMS_MODES, M2_N_MODE),
+                        )
+                        .source(self.agws_gss.clone().fwhm(6.))
+                        .into(),
+                    CalibrationMode::modes(M1_N_MODE, 1e-4),
+                    &closed_loop_optical_model,
+                    CalibrationMode::modes(M2_N_MODE, 1e-6).start_from(2),
                 )?;
-                calib_sh48_bm
-            };
+            calib_sh48_bm.pseudoinverse();
+            serde_pickle::to_writer(
+                &mut File::create(&calib_file_name)?,
+                &calib_sh48_bm,
+                Default::default(),
+            )?;
+            calib_sh48_bm
+        };
         Ok(calib_sh48_bm)
     }
 }

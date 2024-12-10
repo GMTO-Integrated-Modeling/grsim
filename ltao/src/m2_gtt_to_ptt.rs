@@ -5,7 +5,7 @@ use gmt_dos_clients_io::optics::M2GlobalTipTilt;
 use interface::{Data, Read, UniqueIdentifier, Update, Write};
 use serde::{Deserialize, Serialize};
 
-use crate::M2_N_MODE;
+use crate::m2_parameters::M2_N_MODE;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct M2GttToPtt {
@@ -19,7 +19,7 @@ impl M2GttToPtt {
             data: Arc::new(vec![0f64; 2]),
         }
     }
-    pub fn transfrom(&self, gtt: &[f64]) -> Vec<f64> {
+    pub fn transform(&self, gtt: &[f64]) -> Vec<f64> {
         let ptt = self.mat.as_ref() * faer::mat::from_column_major_slice::<f64>(gtt, gtt.len(), 1);
         ptt.col_as_slice(0).to_vec()
     }
@@ -34,7 +34,7 @@ impl<U: UniqueIdentifier<DataType = Vec<f64>>> Write<U> for M2GttToPtt {
     fn write(&mut self) -> Option<Data<U>> {
         // dbg!(ptt.shape());
         Some(
-            self.transfrom(&self.data)
+            self.transform(&self.data)
                 .chunks(3)
                 .flat_map(|ptt| {
                     let mut modes = ptt.to_vec();

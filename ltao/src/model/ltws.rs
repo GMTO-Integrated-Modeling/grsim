@@ -16,7 +16,11 @@ use gmt_dos_clients_crseo::{
     OpticalModel, OpticalModelBuilder,
 };
 
-use crate::{kernels::KernelSpecs, Model, Models, M2_N_MODE};
+use crate::{
+    kernels::KernelSpecs,
+    m2_parameters::{ASMS_MODES, M2_N_MODE},
+    Model, Models,
+};
 
 pub struct Ltws(pub(crate) Models);
 impl Deref for Ltws {
@@ -73,13 +77,16 @@ impl Model for Ltws {
     // }
     fn reconstructor(&self) -> anyhow::Result<Self::Estimator> {
         // println!(" -- LTWS CALIBRATION -- ");
-        let calib_file_name = format!("calib_ltws-full_m2_{M2_N_MODE}modes.pkl");
+        let calib_file_name = format!("calib_ltws-full_m2_{M2_N_MODE}{ASMS_MODES}.pkl");
         let calib_m2_modes: Reconstructor = if let Ok(file) = File::open(&calib_file_name) {
             // println!("loading {calib_file_name}");
             serde_pickle::from_reader(file, Default::default())?
         } else {
             let mut calib_m2_modes = <CentroidsProcessing<Full> as Calibration<GmtM2>>::calibrate(
-                &((&self.builder()).into()),
+                &((&self
+                    .builder()
+                    .gmt(self.gmt_builder.clone().m2(ASMS_MODES, M2_N_MODE)))
+                    .into()),
                 CalibrationMode::modes(M2_N_MODE, 1e-7).start_from(2),
             )?;
             println!("{} cross-talks", calib_m2_modes.n_cross_talks());
@@ -91,7 +98,7 @@ impl Model for Ltws {
             )?;
             calib_m2_modes
         };
-        // println!("{calib_m2_modes}");
+        println!("{calib_m2_modes}");
         Ok(calib_m2_modes)
     }
 }

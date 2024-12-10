@@ -1,10 +1,16 @@
 use std::{env, path::Path};
 
 use crseo::{Atmosphere, FromBuilder, RayTracing};
+use edge_sensors::{
+    AsmsToHexOffload, EdgeSensorsFeedForward, HexToRbm, M1EdgeSensorsAsRbms, M1EdgeSensorsToRbm,
+    M2EdgeSensorsToRbm, RbmToShell,
+};
 use gmt_dos_actors::{actorscript, system::Sys};
 use gmt_dos_clients::{
     gif,
     leftright::{Left, LeftRight, Right, Split},
+    low_pass_filter::LowPassFilter,
+    operator::{self, Operator},
     print::Print,
     Integrator, Timer,
 };
@@ -13,40 +19,45 @@ use gmt_dos_clients_crseo::{
     OpticalModel, OpticalModelBuilder,
 };
 use gmt_dos_clients_io::{
+    gmt_fem::outputs::MCM2SmHexD,
     gmt_m1::{
         assembly::{M1ActuatorCommandForces, M1ModeCoefficients},
         M1ModeShapes, M1RigidBodyMotions,
     },
     gmt_m2::{
-        asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure},
-        M2RigidBodyMotions,
+        asm::{M2ASMAsmCommand, M2ASMFaceSheetFigure, M2ASMVoiceCoilsMotion},
+        M2EdgeSensors, M2RigidBodyMotions,
     },
     optics::{M2GlobalTipTilt, M2modes, SegmentPiston, SegmentWfeRms, Wavefront, WfeRms},
 };
 use gmt_dos_clients_servos::{
-    asms_servo::ReferenceBody, AsmsServo, GmtFem, GmtM1, GmtM2, GmtServoMechanisms, M1SegmentFigure,
+    asms_servo::ReferenceBody, AsmsServo, EdgeSensors, GmtFem, GmtM1, GmtM2, GmtM2Hex,
+    GmtServoMechanisms, M1SegmentFigure,
 };
 use interface::{filing::Filing, Data, Read, Tick, Update, Write, UID};
 use ltao::{
     agws_parameters::{DFS_CAM_INT, DFS_FFT_INT, SH48_INT},
     kernels::KernelFrame,
-    ltws_parameter::LTWS_INT,
     m1_parameters::{M1_ACTUATOR_RATE, M1_N_MODE},
     m2_parameters::M2_N_MODE,
-    meta::MLtws,
-    oiwfs_parameter::OIWFS_INT,
-    Dfs, Ltws, M1BendingModes, M1RbmM2modes, MergeAsmCommand, MetaOpticalModel, ModalToZonal,
-    Model, Models, Oiwfs, RxyPiston, Sh48,
+    Dfs, Ltws, M1BendingModes, M1RbmM2modes, MergeAsmCommand, ModalToZonal, Model, Models, Oiwfs,
+    RxyPiston, Sh48,
 };
+use matio_rs::MatFile;
+use nalgebra as na;
 
 // const N_STEP: usize = 25;
+const ASM_LPF_GAIN: f64 = 0.05;
+const ASM_OFFLOAD_GAIN: f64 = 1. / 2000f64;
+const ASM_OFFLOAD_LEAK: f64 = 0.8;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let data_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+    let data_repo = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("src")
-        .join("bin");
-    env::set_var("DATA_REPO", &data_path);
+        .join("bin")
+        .join("edge-sensors");
+    env::set_var("DATA_REPO", &data_repo);
 
     let sampling_frequency = 8000f64;
     let atm_sampling_frequency = sampling_frequency;
@@ -131,10 +142,21 @@ async fn main() -> anyhow::Result<()> {
 ------------------"#
     );
     // GMT Servomechanisms actors
+    // EDGE SENSORS
+    //  * M1 EDGE SENSORS NODES
+    let es_nodes_2_data: na::DMatrix<f64> =
+        MatFile::load(data_repo.join("M1_edge_sensor_conversion.mat"))?.var("A1")?;
+    //  * EDGE SENSORS TO RIGID-BODY MOTIONS TRANSFORM (M1 & M2)
+    let es_2_m1_rbm = {
+        let mat = MatFile::load(data_repo.join("m12_r_es.mat"))?;
+        let m1_es_recon: na::DMatrix<f64> = mat.var("m1_r_es")?;
+        m1_es_recon.insert_rows(36, 6, 0f64) * es_nodes_2_data
+    };
+    dbg!(es_2_m1_rbm.shape());
     let gmt_servos = Sys::<GmtServoMechanisms<M1_ACTUATOR_RATE, 1>>::from_data_repo_or_else(
         // Path::new(env!("FEM_REPO")).join("servos.bin"),
         format!(
-            "{}_servos.bin",
+            "{}_servos_edge-sensors.bin",
             Path::new(env!("FEM_REPO"))
                 .file_name()
                 .unwrap()
@@ -153,9 +175,16 @@ async fn main() -> anyhow::Result<()> {
                     .facesheet(Default::default())
                     .reference_body(ReferenceBody::new()),
             )
+            .edge_sensors(EdgeSensors::both().m1_with(es_2_m1_rbm))
         },
     )?;
     println!("{gmt_servos}");
+
+    // Voice coils displacements to rigid body motions
+    let asms_to_pos =
+        Sys::new(AsmsToHexOffload::leaky(ASM_OFFLOAD_GAIN, ASM_OFFLOAD_LEAK)?).build()?;
+    // Rigid body motions to facesheet displacements
+    let edge_sensors_feedfwd = Sys::new(EdgeSensorsFeedForward::new(ASM_LPF_GAIN)?).build()?;
 
     // let cmd =
     //     geotrans::Mirror::<geotrans::M1>::tiptilt_2_rigidbodymotions((50f64.from_mas(), 0f64));
@@ -165,14 +194,7 @@ async fn main() -> anyhow::Result<()> {
 
     // let print = Print::default();
 
-    let mom = Sys::new(MetaOpticalModel::<
-        DFS_CAM_INT,
-        DFS_FFT_INT,
-        SH48_INT,
-        OIWFS_INT,
-        LTWS_INT,
-    >::new()?)
-    .build()?;
+    // let mom = Sys::new(MetaOpticalModel::<DFS_CAM_INT, DFS_FFT_INT, SH48_INT>::new()?).build()?;
 
     // Modal to zonal conversion
     let modes2actuators = ModalToZonal::asms().unwrap();
@@ -248,6 +270,8 @@ async fn main() -> anyhow::Result<()> {
     // let sh48_frame = gif::Gif::<f32>::new("sh48_frame.gif", 48 * 8 * 3, 48 * 8)?;
     // let dfs_opd = gif::Gif::<f64>::new("dfs_opd.png", 512);
     let timer: Timer = Timer::new(SH48_INT * 10 * 16);
+    type Operatorf64 = Operator<f64>;
+    type LowPassFilterf64 = LowPassFilter<f64>;
     actorscript!(
         #[model(name=ltws_oiwfs_dfs)]
         #[labels(ltws="GMT w/\n🌫  & LTWS",oiwfs="GMT w/\n🌫  & OIWFS",
@@ -267,7 +291,6 @@ async fn main() -> anyhow::Result<()> {
             -> oiwfs_kernel[M2GlobalTipTilt]
                 -> add_m2_modes //oiwfs
 
-        1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
         1: {gmt_servos::GmtFem}[M1ModeShapes]
             -> m1_bms[M1ModeCoefficients]
         // SH48
@@ -309,6 +332,21 @@ async fn main() -> anyhow::Result<()> {
         1: m1_bms[M1ModeCoefficients] -> sh48
         1: {gmt_servos::GmtFem}[M2RigidBodyMotions] -> sh48
         1: {gmt_servos::GmtFem}[M2ASMFaceSheetFigure] -> sh48
+
+        // send the edge sensors data to the ASMS off-loading algorithm
+        1: {gmt_servos::GmtFem}[M2EdgeSensors]! -> {edge_sensors_feedfwd::M2EdgeSensorsToRbm}
+        // send the reference body RBMS to the ASMS off-loading algorithm
+        1: {gmt_servos::GmtFem}[MCM2SmHexD]! -> {edge_sensors_feedfwd::HexToRbm}
+        1: {gmt_servos::GmtFem}[M1EdgeSensorsAsRbms]! -> {edge_sensors_feedfwd::RbmToShell}
+        // send the ASMS command (actuator displacement) to the ASMS controller
+        1: modes2actuators[operator::Left<M2ASMAsmCommand>] -> {edge_sensors_feedfwd::Operatorf64}
+        1: {edge_sensors_feedfwd::LowPassFilterf64}[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
+        // 1: modes2actuators[M2ASMAsmCommand] -> {gmt_servos::GmtM2}
+
+        // read the voice coil displacement from the FEM
+        1: {gmt_servos::GmtFem}[M2ASMVoiceCoilsMotion]!
+            // transfrom them to rigid body motions (RBMS)
+            -> {asms_to_pos}[M2RigidBodyMotions] -> {gmt_servos::GmtM2Hex}
 
         // 10: ltws[WfeRms<-9>] -> dfs_print
        // 1: oiwfs[WfeRms<-9>]$

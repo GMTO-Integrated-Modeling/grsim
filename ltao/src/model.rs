@@ -20,8 +20,10 @@ pub use oiwfs::Oiwfs;
 pub use sh48::Sh48;
 
 use crate::{
+    agws_parameters::AGWS_N_GS,
     kernels::{Kernel, KernelSpecs},
-    AGWS_N_GS, M1_N_MODE, M2_N_MODE,
+    m1_parameters::{M1_N_MODE, M1_TRUSS_PROJECTION, RAW_BENDING_MODES},
+    m2_parameters::{ASMS_INFLUENCE_FUNCTIONS, ASM_N_ACTUATOR},
 };
 
 pub trait Model: ModelBuilder + KernelSpecs
@@ -108,9 +110,9 @@ impl Models {
     pub fn new() -> Self where {
         Self {
             gmt_builder: Gmt::builder()
-                .m1("bending modes", M1_N_MODE)
-                .m2("Karhunen-Loeve", M2_N_MODE)
-                .m1_truss_projection(false),
+                .m1(RAW_BENDING_MODES, M1_N_MODE)
+                .m2(ASMS_INFLUENCE_FUNCTIONS, ASM_N_ACTUATOR)
+                .m1_truss_projection(M1_TRUSS_PROJECTION),
             agws_gss: Source::builder()
                 .size(AGWS_N_GS)
                 .on_ring(6f32.from_arcmin()),

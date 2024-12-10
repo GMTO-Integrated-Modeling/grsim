@@ -1,24 +1,24 @@
-use crate::{
-    m1_parameters::{M1_MODE_TO_FORCE, M1_N_MODE},
-    m2_parameters::{M2_MODE_TO_FORCE, M2_N_MODE},
-};
+use crate::{SingularModes, M1_MODE_TO_FORCE, M1_N_MODE, M2_MODE_TO_FORCE, M2_N_MODE};
 
-use gmt_dos_clients::operator::Left;
-use gmt_dos_clients_io::{gmt_m1::assembly::M1ActuatorCommandForces, gmt_m2::asm::M2ASMAsmCommand};
-use interface::{Data, Read, UniqueIdentifier, Update, Write};
+use gmt_dos_clients_io::{
+    gmt_m1::{assembly::M1ActuatorCommandForces, M1ModeShapes},
+    gmt_m2::asm::M2ASMAsmCommand,
+    optics::M2modes,
+};
+use interface::{Data, Read, Update, Write};
 use matio_rs::{MatFile, MatioError};
 use nalgebra as na;
 use std::{env, error::Error, mem, path::Path, sync::Arc};
 
 #[derive(Debug)]
-pub struct ModalToZonal {
+pub struct ZonalToModal {
     mats: Vec<na::DMatrix<f64>>,
     modes: Arc<Vec<f64>>,
     actuators: Vec<f64>,
     n_mode: usize,
 }
 
-impl ModalToZonal {
+impl ZonalToModal {
     pub fn new(
         mat_file: &str,
         mat_var_prefix: &str,
@@ -46,7 +46,7 @@ impl ModalToZonal {
     }
 }
 
-impl Update for ModalToZonal {
+impl Update for ZonalToModal {
     fn update(&mut self) {
         // self.mats.iter().for_each(|m| println!("{:?}", m.shape()));
         // dbg!(self.modes.len());
@@ -64,24 +64,24 @@ impl Update for ModalToZonal {
     }
 }
 
-impl<U: UniqueIdentifier<DataType = Vec<f64>>> Read<U> for ModalToZonal {
-    fn read(&mut self, data: Data<U>) {
+impl Read<M2modes> for ZonalToModal {
+    fn read(&mut self, data: Data<M2modes>) {
+        self.modes = data.into_arc();
+    }
+}
+impl Read<M1ModeShapes> for ZonalToModal {
+    fn read(&mut self, data: Data<M1ModeShapes>) {
         self.modes = data.into_arc();
     }
 }
 
-impl Write<M2ASMAsmCommand> for ModalToZonal {
+impl Write<M2ASMAsmCommand> for ZonalToModal {
     fn write(&mut self) -> Option<Data<M2ASMAsmCommand>> {
         Some(self.actuators.clone().into())
     }
 }
-impl Write<Left<M2ASMAsmCommand>> for ModalToZonal {
-    fn write(&mut self) -> Option<Data<Left<M2ASMAsmCommand>>> {
-        Some(self.actuators.clone().into())
-    }
-}
 
-impl Write<M1ActuatorCommandForces> for ModalToZonal {
+impl Write<M1ActuatorCommandForces> for ZonalToModal {
     fn write(&mut self) -> Option<Data<M1ActuatorCommandForces>> {
         Some(self.actuators.clone().into())
     }

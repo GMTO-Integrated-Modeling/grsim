@@ -19,7 +19,10 @@ use gmt_dos_clients_io::{
 };
 use gmt_dos_clients_m2_ctrl::ASMS;
 use interface::Tick;
-use ltao::{ModalToZonal, M2_N_MODE, N_ACTUATOR};
+use ltao::{
+    m2_parameters::{ASM_N_ACTUATOR, M2_N_MODE},
+    ModalToZonal,
+};
 
 const N_STEP: usize = 101;
 
@@ -74,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
     om.initialize(&mut centroids);
 
     let om = om
-        .gmt(gmt.clone().m2("asms_ifs_gmt-fem", N_ACTUATOR))
+        .gmt(gmt.clone().m2("asms_ifs_gmt-fem", ASM_N_ACTUATOR))
         .sampling_frequency(sampling_frequency as f64)
         .atmosphere(atm_builder)
         .build()?;

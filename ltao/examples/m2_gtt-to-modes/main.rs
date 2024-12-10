@@ -15,7 +15,7 @@ use gmt_dos_clients_io::{
     gmt_m2::asm::M2ASMAsmCommand,
     optics::{Dev, Frame, M2GlobalTipTilt, SensorData, Wavefront, WfeRms},
 };
-use ltao::{M2GttToPtt, Model, Models};
+use ltao::{m2_parameters::ASMS_MODES, M2GttToPtt, Model, Models};
 use skyangle::Conversion;
 
 const MIN_N_MODE: usize = 3;
@@ -23,8 +23,8 @@ const MIN_N_MODE: usize = 3;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let models = Models::new();
-    let om =
-        OpticalModel::<WaveSensor>::builder().gmt(models.gmt_builder.clone().m2_n_mode(MIN_N_MODE));
+    let om = OpticalModel::<WaveSensor>::builder()
+        .gmt(models.gmt_builder.clone().m2(ASMS_MODES, MIN_N_MODE));
 
     // M2 1,2,3 modes calibration
     let mut m2_modes: Reconstructor = <WaveSensor as Calibration<GmtM2>>::calibrate(
@@ -98,7 +98,7 @@ async fn main() -> anyhow::Result<()> {
         let oiwfs = models
             .oiwfs()
             .builder()
-            .gmt(models.gmt_builder.clone().m2_n_mode(MIN_N_MODE))
+            .gmt(models.gmt_builder.clone().m2(ASMS_MODES, MIN_N_MODE))
             .build()?;
         let oiwfs_centroids = models.oiwfs().processor()?;
         let signal = Signals::new(2, 1).channel(0, 250f64.from_mas());
@@ -129,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
         let oiwfs = models
             .oiwfs()
             .builder()
-            .gmt(models.gmt_builder.clone().m2_n_mode(MIN_N_MODE))
+            .gmt(models.gmt_builder.clone().m2(ASMS_MODES, MIN_N_MODE))
             .build()?;
         let oiwfs_centroids = models.oiwfs().processor()?;
         let signal0 = Signals::new(2, 1).channel(0, -250f64.from_mas());
